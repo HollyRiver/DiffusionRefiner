@@ -56,8 +56,12 @@ def resolve_device(gpu):
         "Refusing to train on CPU (would take days). Use --gpu -1 to force CPU explicitly.")
 
 
-def resolve_train_dirs(mode, dumps_root, work_dir, member_glob):
-    """모드별 학습/검증 y_blur 디렉토리 결정."""
+def resolve_train_dirs(mode, dumps_root, work_dir, member_glob, train_members="first"):
+    """모드별 학습/검증 y_blur 디렉토리 결정.
+
+    member 모드 + train_members="all" 이면 멤버 디렉토리 '리스트'를 반환한다
+    (모든 멤버를 union으로 학습/검증 — 한 타임스탬프당 멤버 수만큼 샘플).
+    """
     dumps_root = Path(dumps_root)
     if mode == "ensemble":
         train_dir = materialize_mean(dumps_root / "train", Path(work_dir) / "mean_cache" / "train",
@@ -69,14 +73,29 @@ def resolve_train_dirs(mode, dumps_root, work_dir, member_glob):
             print(f"[warn] no val dumps ({e}); validation skipped, best==train")
             val_dir = None
     else:  # member
-        train_dir = discover_members(dumps_root / "train", member_glob)[0]
-        print(f"[member] training on single member: {train_dir}")
+        tdirs = discover_members(dumps_root / "train", member_glob)
+        if train_members == "all":
+            train_dir = tdirs
+            print(f"[member] training on ALL {len(tdirs)} members (union)")
+        else:
+            train_dir = tdirs[0]
+            print(f"[member] training on single member: {train_dir}")
         try:
-            val_dir = discover_members(dumps_root / "val", member_glob)[0]
+            vdirs = discover_members(dumps_root / "val", member_glob)
+            val_dir = vdirs if train_members == "all" else vdirs[0]
         except FileNotFoundError as e:
             print(f"[warn] no val dumps ({e}); validation skipped, best==train")
             val_dir = None
     return train_dir, val_dir
+
+
+def build_items_any(dir_or_dirs, raw_dir, offset, **kw):
+    """단일 디렉토리 또는 디렉토리 리스트(멤버 union)를 items로 페어링."""
+    dirs = dir_or_dirs if isinstance(dir_or_dirs, (list, tuple)) else [dir_or_dirs]
+    items = []
+    for d in dirs:
+        items += build_items(d, raw_dir, offset, **kw)
+    return items
 
 
 def run_val(R, val_loader, noise_sched, device):
@@ -107,6 +126,9 @@ def main():
     ap.add_argument("--raw_data_dir", type=str, default=CFG["raw_data_dir"])
     ap.add_argument("--work_dir", type=str, default=CFG["work_dir"])
     ap.add_argument("--member_glob", type=str, default=CFG["member_glob"])
+    ap.add_argument("--train_members", type=str, default="first", choices=["first", "all"],
+                    help="member 모드 학습 데이터: first=첫 멤버만, all=모든 멤버 union "
+                         "(타임스탬프당 멤버 수만큼 학습 샘플; val도 동일하게 확장)")
     ap.add_argument("--dump_value_range", type=str, default=CFG["dump_value_range"],
                     choices=["m11", "raw"])
     ap.add_argument("--epochs", type=int, default=CFG["epochs"])
@@ -128,11 +150,11 @@ def main():
     print(f"[save]   {save_dir}")
 
     train_dir, val_dir = resolve_train_dirs(args.mode, args.dumps_root, args.work_dir,
-                                            args.member_glob)
+                                            args.member_glob, args.train_members)
     kw = dict(num_context=CFG["num_context"], frame_min=CFG["frame_interval_minutes"],
               filename_format=CFG["filename_format"])
-    train_items = build_items(train_dir, args.raw_data_dir, args.offset, **kw)
-    val_items = build_items(val_dir, args.raw_data_dir, args.offset, **kw) if val_dir else []
+    train_items = build_items_any(train_dir, args.raw_data_dir, args.offset, **kw)
+    val_items = build_items_any(val_dir, args.raw_data_dir, args.offset, **kw) if val_dir else []
     if len(train_items) == 0:
         raise RuntimeError(
             f"No train items for offset={args.offset} in {train_dir}. "

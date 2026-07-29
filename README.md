@@ -45,6 +45,19 @@ python train_refiner.py --mode member --offset 1 --gpu 0
 python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 ```
 
+**모드 B 변형 — train/val에도 멤버가 전부 있는 경우 (`--train_members all`)**
+모든 멤버를 union으로 학습합니다(타임스탬프당 멤버 수만큼 학습 샘플, val도 동일 확장).
+추론은 모드 B와 같습니다(멤버 각각 보정 → 평균). 에폭당 데이터가 멤버 수배가 되므로
+`--epochs`/`--warmup_epochs`를 그에 맞게 줄이는 것을 권장합니다.
+
+```bash
+python train_refiner.py --mode member --train_members all --offset 1 --gpu 0 --epochs 12 --warmup_epochs 4
+python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
+```
+
+주의: 변형(예: first vs all)마다 체크포인트 폴더명이 같으므로(`refiner_t{N}_member`)
+**실험별로 `--work_dir`를 분리**하세요.
+
 최종 출력: `{work_dir}/outputs_t{N}_{mode}/prediction/{timestamp}.pt`
 (m11 범위, `(1,H,W)`, 타임스탬프당 1개). 물리 단위 복원: `x_raw = (x+1)/2*(max-min)+min`.
 
