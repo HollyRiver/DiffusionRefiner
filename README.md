@@ -7,9 +7,12 @@
 - 원리: `residual = GT − y_blur` 를 x0-파라미터화 확산으로 학습, 추론 시 DDIM으로
   residual을 샘플링해 `y_sharp = y_blur + residual`
 
-> 📖 **상세 설명 문서**: 원리 · 두 가지 모드 · 모델 구조 · 적응 가이드를 다이어그램과
-> 함께 정리한 문서 — [DiffusionRefiner 기술 문서](https://claude.ai/code/artifact/21a64b96-6bf5-44de-9f8d-068bce7a4969)
-> (Claude 아티팩트 — 열람하려면 소유자가 공유 설정을 켜야 합니다)
+> 📖 **기술 문서**: 원리 · 수학적 정식화 · 아키텍처 해부 · 실험 결과를 다이어그램과
+> 함께 정리한 문서 — [RefinementUNet 기술 문서](https://claude.ai/code/artifact/18527f2a-c64a-40af-940d-a7f7b8e0c1e4)
+>
+> ⭐ 연구에서 **채택된 방식은 member 모드** — 멤버별 보정 후 평균("8 members refined
+> mean")입니다. ensemble 모드(평균 후 1회 보정)는 비교 실험에서 정확도·확률 지표
+> (MSE·SSIM·CRPS) 열세로 채택되지 않았으며, 코드에는 비교·일반 용도로 남아 있습니다.
 
 ## 입력 계약 (반드시 읽기)
 
