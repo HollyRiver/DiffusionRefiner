@@ -1,7 +1,6 @@
-# Refiner 후처리 모듈 (portable)
+# Diffusion-Based Residual Generation Refiner (아마도?)
 
-베이스 예측 모델의 **추론 덤프**를 입력으로, 잔차 확산(residual diffusion) Refiner를
-학습하고 최종 보정 예측을 산출하는 자립형 모듈입니다. 이 폴더만 복사해서 쓰면 됩니다.
+&nbsp;베이스 예측 모델(DAD)의 추론 덤프를 입력으로, 잔차 확산(residual diffusion) Refiner를 학습하고 최종 보정 예측을 산출하는 자립형 모듈입니다. 올인원 리포지토리입니다. 또한, 설명의 대부분은 클로드 코드에 의해 작성되었습니다. 저도 아직 이해중입니다.
 
 - 의존성: `torch`, `numpy` (그 외 없음)
 - 원리: `residual = GT − y_blur` 를 x0-파라미터화 확산으로 학습, 추론 시 DDIM으로
@@ -14,7 +13,7 @@
 > mean")입니다. ensemble 모드(평균 후 1회 보정)는 비교 실험에서 정확도·확률 지표
 > (MSE·SSIM·CRPS) 열세로 채택되지 않았으며, 코드에는 비교·일반 용도로 남아 있습니다.
 
-## 입력 계약 (반드시 읽기)
+## 입력 계약
 
 ```
 {dumps_root}/                      # config.py 또는 --dumps_root
