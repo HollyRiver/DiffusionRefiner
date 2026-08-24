@@ -61,6 +61,11 @@ python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 최종 출력: `{work_dir}/outputs_t{N}_{mode}/prediction/{timestamp}.pt`
 (m11 범위, `(1,H,W)`, 타임스탬프당 1개). 물리 단위 복원: `x_raw = (x+1)/2*(max-min)+min`.
 
+체크포인트: `{work_dir}/refiner_t{N}_{mode}/`에 `best_R.pt`(최저 val), `last_R.pt`(최종
+epoch)와 함께 기본값으로 **매 epoch `ep{에폭}_R.pt`가 저장됩니다** (`--save_every N`,
+0=끄기, 개당 ~9MB — 30 epoch에 ~270MB). 중간-epoch 성능 비교나 특정 epoch 재현이
+나중에 필요해질 수 있으므로 끄지 않기를 권장합니다.
+
 horizon이 여러 개면 `--offset 1..4`를 각각 실행하세요 (horizon마다 별도 refiner).
 
 ## 검증

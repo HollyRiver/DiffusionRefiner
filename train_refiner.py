@@ -56,11 +56,15 @@ def resolve_device(gpu):
         "Refusing to train on CPU (would take days). Use --gpu -1 to force CPU explicitly.")
 
 
-def resolve_train_dirs(mode, dumps_root, work_dir, member_glob, train_members="first"):
+def resolve_train_dirs(mode, dumps_root, work_dir, member_glob, train_members="first",
+                       val_members="all"):
     """모드별 학습/검증 y_blur 디렉토리 결정.
 
     member 모드 + train_members="all" 이면 멤버 디렉토리 '리스트'를 반환한다
     (모든 멤버를 union으로 학습/검증 — 한 타임스탬프당 멤버 수만큼 샘플).
+    val_members 는 검증 멤버 선택을 학습과 독립적으로 정한다: "all"=학습과 동일하게
+    확장(기존 동작), "first"=첫 멤버(member_0)만으로 검증 (에폭당 val 비용 K배 절감,
+    best 선택 품질엔 영향 미미 — val MSE는 수천 샘플 평균만으로 이미 안정적).
     """
     dumps_root = Path(dumps_root)
     if mode == "ensemble":
@@ -82,7 +86,11 @@ def resolve_train_dirs(mode, dumps_root, work_dir, member_glob, train_members="f
             print(f"[member] training on single member: {train_dir}")
         try:
             vdirs = discover_members(dumps_root / "val", member_glob)
-            val_dir = vdirs if train_members == "all" else vdirs[0]
+            if val_members == "all" and train_members == "all":
+                val_dir = vdirs
+            else:
+                val_dir = vdirs[0]
+                print(f"[member] validating on single member: {vdirs[0]}")
         except FileNotFoundError as e:
             print(f"[warn] no val dumps ({e}); validation skipped, best==train")
             val_dir = None
@@ -129,6 +137,9 @@ def main():
     ap.add_argument("--train_members", type=str, default="first", choices=["first", "all"],
                     help="member 모드 학습 데이터: first=첫 멤버만, all=모든 멤버 union "
                          "(타임스탬프당 멤버 수만큼 학습 샘플; val도 동일하게 확장)")
+    ap.add_argument("--val_members", type=str, default="all", choices=["first", "all"],
+                    help="검증 멤버 선택(학습과 독립): all=학습과 동일 확장(기본), "
+                         "first=member_0만 (val 비용 K배↓, best 선택 품질 영향 미미)")
     ap.add_argument("--dump_value_range", type=str, default=CFG["dump_value_range"],
                     choices=["m11", "raw"])
     ap.add_argument("--epochs", type=int, default=CFG["epochs"])
@@ -139,6 +150,17 @@ def main():
     ap.add_argument("--min_lr", type=float, default=CFG["min_lr"])
     ap.add_argument("--num_workers", type=int, default=CFG["num_workers"])
     ap.add_argument("--max_iters_per_epoch", type=int, default=None)
+    ap.add_argument("--save_every", type=int, default=CFG["save_every"],
+                    help="N>0이면 매 N epoch마다 ep{에폭}_R.pt 저장 (0=끄기, 기본=CFG)")
+    ap.add_argument("--resume_ckpt", type=str, default=None,
+                    help="이 체크포인트 가중치에서 이어서 학습 (예: ep45_R.pt). "
+                         "--start_epoch, --init_best_val과 함께 사용. 크래시 복구용.")
+    ap.add_argument("--start_epoch", type=int, default=0,
+                    help="이어서 시작할 0-indexed epoch (예: 45 → 46번째 epoch부터). "
+                         "LR 코사인 스케줄과 loss_log가 이 값 기준으로 정렬됨.")
+    ap.add_argument("--init_best_val", type=float, default=float("inf"),
+                    help="resume 시 best 판정 초기값 (기존 best_R.pt의 val). "
+                         "이보다 나빠지면 best_R.pt를 덮어쓰지 않음.")
     args = ap.parse_args()
 
     device = resolve_device(args.gpu)
@@ -150,7 +172,7 @@ def main():
     print(f"[save]   {save_dir}")
 
     train_dir, val_dir = resolve_train_dirs(args.mode, args.dumps_root, args.work_dir,
-                                            args.member_glob, args.train_members)
+                                            args.member_glob, args.train_members, args.val_members)
     kw = dict(num_context=CFG["num_context"], frame_min=CFG["frame_interval_minutes"],
               filename_format=CFG["filename_format"])
     train_items = build_items_any(train_dir, args.raw_data_dir, args.offset, **kw)
@@ -182,6 +204,10 @@ def main():
     ).to(device)
     print(f"[R]      params={sum(p.numel() for p in R.parameters()):,} "
           f"in_channels={R.in_channels}")
+    if args.resume_ckpt:
+        R.load_state_dict(torch.load(args.resume_ckpt, map_location=device, weights_only=True))
+        print(f"[resume] loaded {args.resume_ckpt}; start_epoch={args.start_epoch} "
+              f"init_best_val={args.init_best_val}")
     noise_sched = NoiseSchedule(T=1000, device=device)
 
     opt = torch.optim.AdamW(R.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -189,14 +215,25 @@ def main():
     total_steps = steps_per_epoch * args.epochs
     warmup_steps = steps_per_epoch * args.warmup_epochs
 
-    best_val = float("inf")
+    best_val = args.init_best_val
     log_path = save_dir / "loss_log.csv"
-    with open(log_path, "w") as flog:
-        flog.write("epoch,train_residual_mse,val_residual_mse,lr,time_s\n")
+    if args.start_epoch > 0 and log_path.exists():
+        # resume: 기존 loss_log에서 <= start_epoch 행만 남기고 이어붙임 (중복 방지)
+        import csv as _csv
+        with open(log_path) as f:
+            kept = [r for r in _csv.reader(f)]
+        header, body = kept[0], [r for r in kept[1:] if r and int(r[0]) <= args.start_epoch]
+        with open(log_path, "w", newline="") as f:
+            w = _csv.writer(f); w.writerow(header); w.writerows(body)
+        print(f"[resume] loss_log truncated to <= ep{args.start_epoch} ({len(body)} rows)")
+    else:
+        with open(log_path, "w") as flog:
+            flog.write("epoch,train_residual_mse,val_residual_mse,lr,time_s\n")
 
-    gstep = 0
-    print(f"[train]  epochs={args.epochs} bs={args.batch_size} steps/ep={steps_per_epoch}")
-    for epoch in range(args.epochs):
+    gstep = args.start_epoch * steps_per_epoch
+    print(f"[train]  epochs={args.epochs} bs={args.batch_size} steps/ep={steps_per_epoch} "
+          f"start_epoch={args.start_epoch}")
+    for epoch in range(args.start_epoch, args.epochs):
         R.train()
         ep_sum, ep_n = 0.0, 0
         t0 = time.time()
@@ -241,6 +278,10 @@ def main():
             best_val = crit
             torch.save(R.state_dict(), save_dir / "best_R.pt")
             print(f"  * saved best_R.pt (crit={crit:.6f})")
+
+        if args.save_every > 0 and (epoch + 1) % args.save_every == 0:
+            torch.save(R.state_dict(), save_dir / f"ep{epoch+1}_R.pt")
+            print(f"  * saved ep{epoch+1}_R.pt")
 
     torch.save(R.state_dict(), save_dir / "last_R.pt")
     print(f"[done]   best={best_val:.6f}  ckpts in {save_dir}")

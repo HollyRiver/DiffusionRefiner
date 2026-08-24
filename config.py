@@ -33,6 +33,9 @@ CFG = {
     "min_lr": 1e-6,
     "grad_clip": 1.0,
     "num_workers": 4,
+    # 매 N epoch마다 ep{N}_R.pt 체크포인트 저장 (0=끄기). 개당 ~9MB.
+    # 중간-epoch 비교/재현이 나중에 필요해도 재학습 없이 가능하도록 기본 ON.
+    "save_every": 1,
 
     # ── 모델 (baseline_ver03 refiner와 동일) ────────────────────────────
     "input_size": 512,
