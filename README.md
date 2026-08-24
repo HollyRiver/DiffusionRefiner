@@ -7,10 +7,7 @@
   residual을 샘플링해 `y_sharp = y_blur + residual`
 
 > 📖 **기술 문서** ☆★☆★☆★☆ 여기에 이론적 내용이 적혀있음!!! ★☆★☆★☆★: 원리 · 수학적 정식화 · 아키텍처 해부 · 실험 결과를 다이어그램과
-> 함께 정리한 문서 — [RefinementUNet 기술 문서](https://claude.ai/code/artifact/18527f2a-c64a-40af-940d-a7f7b8e0c1e4)
->
-> 웹에서 바로 보기 (로그인 불필요): **https://hollyriver.github.io/DiffusionRefiner/**
-> (GitHub Pages — [docs/RefinementUNet.html](docs/RefinementUNet.html)을 서비스)
+> 함께 정리한 문서 — [RefinementUNet 기술 문서](https://hollyriver.github.io/DiffusionRefiner/)
 >
 > ⭐ 연구에서 **채택된 방식은 member 모드** — 멤버별 보정 후 평균("8 members refined
 > mean")입니다. ensemble 모드(평균 후 1회 보정)는 비교 실험에서 정확도·확률 지표
