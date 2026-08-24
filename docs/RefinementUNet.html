@@ -516,7 +516,7 @@ out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1�
 
 <h2 id="s10">10. 재현 정보</h2>
 <dl class="kv">
-  <dt>코드</dt><dd><a href="https://github.com/HollyRiver/DiffusionRefiner">github.com/HollyRiver/DiffusionRefiner</a> (포터블 모듈 전체, private) · 로컬 <span class="path">/DATA/shinsung/refiner_module/</span> — <span class="path">refiner/unet.py</span>(모델·스케줄·DDIM), <span class="path">train_refiner.py</span>, <span class="path">infer_refiner.py</span>, <span class="path">config.py</span>, README(입력 계약·적응 가이드). 의존성 torch·numpy뿐</dd>
+  <dt>코드</dt><dd><a href="https://github.com/HollyRiver/DiffusionRefiner">github.com/HollyRiver/DiffusionRefiner</a> (공개 리포 — 이 문서의 웹 사본: <a href="https://hollyriver.github.io/DiffusionRefiner/">hollyriver.github.io/DiffusionRefiner</a>) · 로컬 <span class="path">/DATA/shinsung/refiner_module/</span> — <span class="path">refiner/unet.py</span>(모델·스케줄·DDIM), <span class="path">train_refiner.py</span>, <span class="path">infer_refiner.py</span>, <span class="path">config.py</span>, README(입력 계약·적응 가이드). 의존성 torch·numpy뿐</dd>
   <dt>계보</dt><dd>자체 ST-DiT 실험 라인의 <span class="path">refinement_unet.py</span> → baseline_ver03 이식 → 포터블 모듈화. 협업 저장소(DiffusionIrradiancePrediction)와 코드 공유 없음 (git 전 이력 확인)</dd>
   <dt>학습 명령</dt><dd><code>python train_refiner.py --mode member --train_members all --offset N --gpu 0</code></dd>
   <dt>추론 명령</dt><dd><code>python infer_refiner.py --mode member --offset N --gpu 0 --save_members</code></dd>

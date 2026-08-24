@@ -9,8 +9,8 @@
 > 📖 **기술 문서** ☆★☆★☆★☆ 여기에 이론적 내용이 적혀있음!!! ★☆★☆★☆★: 원리 · 수학적 정식화 · 아키텍처 해부 · 실험 결과를 다이어그램과
 > 함께 정리한 문서 — [RefinementUNet 기술 문서](https://claude.ai/code/artifact/18527f2a-c64a-40af-940d-a7f7b8e0c1e4)
 >
-> 같은 문서의 사본이 [docs/RefinementUNet.html](docs/RefinementUNet.html)에 들어 있습니다 —
-> 위 링크가 안 열리면(조직 외부 등) 이 파일을 받아 브라우저로 여세요.
+> 웹에서 바로 보기 (로그인 불필요): **https://hollyriver.github.io/DiffusionRefiner/**
+> (GitHub Pages — [docs/RefinementUNet.html](docs/RefinementUNet.html)을 서비스)
 >
 > ⭐ 연구에서 **채택된 방식은 member 모드** — 멤버별 보정 후 평균("8 members refined
 > mean")입니다. ensemble 모드(평균 후 1회 보정)는 비교 실험에서 정확도·확률 지표
