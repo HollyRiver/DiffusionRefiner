@@ -6,7 +6,7 @@
 - 원리: `residual = GT − y_blur` 를 x0-파라미터화 확산으로 학습, 추론 시 DDIM으로
   residual을 샘플링해 `y_sharp = y_blur + residual`
 
-> 📖 **기술 문서**: 원리 · 수학적 정식화 · 아키텍처 해부 · 실험 결과를 다이어그램과
+> 📖 **기술 문서** ☆★☆★☆★☆ 여기에 이론적 내용이 적혀있음!!! ★☆★☆★☆★: 원리 · 수학적 정식화 · 아키텍처 해부 · 실험 결과를 다이어그램과
 > 함께 정리한 문서 — [RefinementUNet 기술 문서](https://claude.ai/code/artifact/18527f2a-c64a-40af-940d-a7f7b8e0c1e4)
 >
 > ⭐ 연구에서 **채택된 방식은 member 모드** — 멤버별 보정 후 평균("8 members refined
