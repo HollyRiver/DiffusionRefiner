@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RefinementUNet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #FBF8F2;
+  --surface: #F3EDE1;
+  --surface2: #EDE5D5;
+  --line: #DFD5C0;
+  --ink: #2A2418;
+  --muted: #7C7160;
+  --accent: #A96A0C;
+  --accent-soft: #F4E5C8;
+  --blue: #46647E;
+  --blue-soft: #E2E9EF;
+  --code-bg: #EFE8D9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17130D; --surface: #211B12; --surface2: #2A2216; --line: #3C3222;
+    --ink: #ECE4D2; --muted: #A2957C; --accent: #E0A83F; --accent-soft: #3A2D14;
+    --blue: #8FAEC9; --blue-soft: #22303C; --code-bg: #2A2317;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17130D; --surface: #211B12; --surface2: #2A2216; --line: #3C3222;
+  --ink: #ECE4D2; --muted: #A2957C; --accent: #E0A83F; --accent-soft: #3A2D14;
+  --blue: #8FAEC9; --blue-soft: #22303C; --code-bg: #2A2317;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-size: 16px; line-height: 1.75; margin: 0; padding: 0 20px 96px;
+}
+.wrap { max-width: 800px; margin: 0 auto; }
+header.doc { padding: 60px 0 10px; border-bottom: 1px solid var(--line); }
+.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin: 0 0 14px; }
+h1 { font-family: "Gowun Batang", serif; font-size: 42px; line-height: 1.25; font-weight: 700; margin: 0 0 12px; text-wrap: balance; }
+.lede { color: var(--muted); font-size: 17px; margin: 0 0 24px; max-width: 64ch; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; }
+.chip { font-size: 12.5px; font-weight: 500; padding: 3px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-variant-numeric: tabular-nums; }
+a.chip { text-decoration: none; border: 1px solid var(--accent); }
+a.chip:hover { background: var(--accent); color: var(--bg); }
+h2 { font-family: "Gowun Batang", serif; font-size: 27px; font-weight: 700; line-height: 1.35; margin: 62px 0 4px; text-wrap: balance; }
+h2 + .sub { color: var(--muted); font-size: 14.5px; margin: 0 0 20px; }
+h3 { font-size: 18px; font-weight: 700; margin: 34px 0 8px; }
+p { margin: 0 0 16px; max-width: 68ch; }
+ul, ol { margin: 0 0 16px; padding-left: 22px; max-width: 66ch; }
+li { margin-bottom: 7px; }
+strong { font-weight: 700; }
+code, .path { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+pre { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13.5px; line-height: 1.65; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 0 0 18px; }
+pre code { background: none; padding: 0; }
+.formula { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 14.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 18px; margin: 0 0 16px; overflow-x: auto; line-height: 1.9; }
+.tablewrap { overflow-x: auto; margin: 0 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; border-bottom: 2px solid var(--line); }
+td.num, th.num { text-align: right; }
+tr.block-head td { font-weight: 700; background: var(--surface); }
+.best { color: var(--accent); font-weight: 700; }
+figure { margin: 30px 0 34px; }
+figure svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+figcaption { font-size: 13.5px; color: var(--muted); margin-top: 12px; text-align: center; max-width: 70ch; margin-left: auto; margin-right: auto; }
+.callout { background: var(--surface); border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 22px; margin: 26px 0; }
+.callout h3 { margin: 0 0 8px; font-size: 16px; }
+.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 13px 18px; margin: 18px 0; font-size: 14.5px; color: var(--muted); }
+.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 24px; margin: 28px 0 0; font-size: 14.5px; columns: 2; column-gap: 32px; }
+.toc a { display: block; color: var(--ink); text-decoration: none; padding: 3px 0; break-inside: avoid; }
+.toc a:hover { color: var(--accent); }
+.toc .n { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 8px; font-weight: 500; }
+.kv { display: grid; grid-template-columns: 190px 1fr; gap: 4px 18px; font-size: 14.5px; margin: 0 0 18px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+footer.doc { margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+a { color: var(--accent); }
+a:focus-visible, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 660px) {
+  h1 { font-size: 32px; }
+  .toc { columns: 1; }
+  .kv { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header class="doc">
+  <p class="eyebrow">기술 문서 · 2026-08-24 · 위성 일사량 예측 파이프라인 Stage 2</p>
+  <h1>RefinementUNet</h1>
+  <p class="lede">확산 앙상블 예측의 픽셀 오차를 보정하는 <strong>조건부 잔차 확산 보정기</strong>(conditional residual-diffusion refiner)의 완전한 기술 명세 — 파이프라인, 구성요소, 통상적 확산 모델과의 차이, 그리고 "디퓨전 두 개"가 아닌 이유.</p>
+  <div class="chips">
+    <span class="chip">2,252,769 파라미터</span>
+    <span class="chip">확산 대상 = 잔차</span>
+    <span class="chip">x0-파라미터화</span>
+    <span class="chip">DDIM-40 · η=0</span>
+    <span class="chip">zero-init 항등 출발</span>
+    <span class="chip">지평선별 독립 학습</span>
+    <a class="chip" href="https://github.com/HollyRiver/DiffusionRefiner">코드 저장소 ↗</a>
+  </div>
+  <nav class="toc" aria-label="목차">
+    <a href="#s1"><span class="n">1</span>무엇이며 왜 필요한가</a>
+    <a href="#s2"><span class="n">2</span>전체 파이프라인</a>
+    <a href="#s3"><span class="n">3</span>수학적 정식화</a>
+    <a href="#s4"><span class="n">4</span>아키텍처 해부</a>
+    <a href="#s5"><span class="n">5</span>학습 절차</a>
+    <a href="#s6"><span class="n">6</span>추론과 앙상블 집계</a>
+    <a href="#s7"><span class="n">7</span>통상적 확산 모델과의 차이</a>
+    <a href="#s8"><span class="n">8</span>"디퓨전 두 개"가 아닌 이유</a>
+    <a href="#s9"><span class="n">9</span>실험 결과 요약</a>
+    <a href="#s10"><span class="n">10</span>재현 정보</a>
+  </nav>
+</header>
+
+<h2 id="s1">1. 무엇이며 왜 필요한가</h2>
+<p>이 파이프라인의 Stage 1은 조건부 확산 모델(DAD)이다. 과거 30분 간격 위성 일사량 프레임 5장을 조건으로 미래 프레임(t+30~120분)의 <em>조건부 분포</em>를 학습하고, 추론 시 서로 다른 노이즈 시드로 8회 샘플링해 MC-8 앙상블을 만든다. 확산 모델의 개별 샘플은 날카롭지만, 두 가지 픽셀 수준 오차가 남는다:</p>
+<ul>
+  <li><strong>유한 스텝 샘플링 오차</strong> — DDIM 40스텝 근사와 확률적 샘플링 자체의 분산.</li>
+  <li><strong>앙상블 평균의 블러</strong> — 8개 멤버를 픽셀 평균하면 MSE는 좋아지지만, 멤버마다 위치가 조금씩 다른 구름 경계가 상쇄되어 고주파 디테일이 뭉개진다(스펙트럼 평균화). FID·LPIPS가 나빠지는 원인.</li>
+</ul>
+<p><strong>RefinementUNet</strong>은 이 오차를 사후에 고치는 Stage 2다. 핵심 아이디어는 이미지를 다시 그리지 않고, <strong>정답과 베이스 예측의 차이(잔차) r = x − ŷ 만을 작은 확산 모델로 학습·샘플링해 ŷ에 더하는 것</strong>이다. Stage 1은 완전히 동결되며, 두 단계는 파일(예측 덤프)로만 연결된다.</p>
+<div class="callout">
+  <h3>한 문장 요약</h3>
+  <p>동결된 확산 예보기의 출력 ŷ 위에서, 그 예보기의 <em>조건부 오차 분포</em> p(r | ŷ, context)를 x0-파라미터화 확산으로 학습하고, 결정적 DDIM으로 잔차를 샘플링해 x̃ = ŷ + r̂ 로 복원하는 2.25M 파라미터의 경량 보정기.</p>
+</div>
+
+<h2 id="s2">2. 전체 파이프라인</h2>
+<p class="sub">학습과 추론의 데이터 흐름 — Stage 1은 두 경로 모두에서 동결 상태</p>
+
+<figure>
+<svg viewBox="0 0 920 540" role="img" aria-label="학습 경로: DAD 멤버 덤프와 원본 저장소에서 잔차를 구성해 노이즈를 주입하고 RefinementUNet이 깨끗한 잔차를 예측하도록 MSE로 학습. 추론 경로: 테스트 멤버 8개를 각각 결정적 DDIM으로 보정한 뒤 픽셀 평균해 최종 예측을 산출.">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <!-- ══ Lane 1: training ══ -->
+  <text x="20" y="24" font-size="14" font-weight="700" fill="currentColor">① 학습 — Stage 1 동결, 오프라인 덤프 위에서</text>
+
+  <!-- yhat wire (top) -->
+  <path d="M 105 58 L 105 42 L 810 42 L 810 88" stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="420" y="38" font-size="11.5" fill="var(--muted)">ŷ (조건 입력으로도 전달)</text>
+
+  <rect x="20" y="58" width="170" height="62" rx="9" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.3"/>
+  <text x="105" y="83" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">DAD 멤버 덤프</text>
+  <text x="105" y="103" text-anchor="middle" font-size="11.5" fill="var(--muted)">ŷ · train/val · m11 .pt</text>
+
+  <rect x="20" y="148" width="170" height="62" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="105" y="173" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">원본 프레임 저장소</text>
+  <text x="105" y="193" text-anchor="middle" font-size="11.5" fill="var(--muted)">context C 5장 + GT x</text>
+
+  <rect x="252" y="96" width="128" height="56" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="316" y="119" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">잔차 구성</text>
+  <text x="316" y="138" text-anchor="middle" font-size="12" fill="var(--muted)">r = x − ŷ</text>
+
+  <rect x="428" y="96" width="182" height="56" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="519" y="119" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">노이즈 주입</text>
+  <text x="519" y="138" text-anchor="middle" font-size="11.5" fill="var(--muted)">x_t = √ᾱ_t·r + √(1−ᾱ_t)·ε</text>
+  <text x="519" y="168" text-anchor="middle" font-size="11" fill="var(--muted)">t ~ U{0..999}, ε ~ N(0, I)</text>
+
+  <rect x="660" y="88" width="240" height="78" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="780" y="112" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">RefinementUNet R</text>
+  <text x="780" y="131" text-anchor="middle" font-size="11.5" fill="var(--muted)">입력: x_t · C · ŷ + (t, 계절, lead)</text>
+  <text x="780" y="150" text-anchor="middle" font-size="11.5" fill="var(--muted)">출력: 깨끗한 잔차 예측 r̂₀</text>
+
+  <rect x="695" y="208" width="170" height="42" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="780" y="234" text-anchor="middle" font-size="12.5" fill="currentColor">ℒ = ‖ r̂₀ − r ‖²</text>
+
+  <g stroke="currentColor" stroke-width="1.3" fill="none">
+    <path d="M 190 89 L 221 89 L 221 110 L 250 110" marker-end="url(#ar)"/>
+    <path d="M 190 179 L 221 179 L 221 138 L 250 138" marker-end="url(#ar)"/>
+    <line x1="380" y1="124" x2="426" y2="124" marker-end="url(#ar)"/>
+    <line x1="610" y1="124" x2="658" y2="124" marker-end="url(#ar)"/>
+    <line x1="780" y1="166" x2="780" y2="206" marker-end="url(#ar)"/>
+    <path d="M 105 210 L 105 240 L 700 240 L 700 168" marker-end="url(#ar)"/>
+  </g>
+  <text x="196" y="82" font-size="11" fill="var(--muted)">ŷ</text>
+  <text x="196" y="172" font-size="11" fill="var(--muted)">x</text>
+  <text x="394" y="118" font-size="11" fill="var(--muted)">r</text>
+  <text x="622" y="118" font-size="11" fill="var(--muted)">x_t</text>
+  <text x="390" y="255" font-size="11.5" fill="var(--muted)">context C 5장 (조건 입력)</text>
+
+  <!-- ══ Lane 2: inference ══ -->
+  <line x1="20" y1="286" x2="900" y2="286" stroke="var(--line)" stroke-width="1"/>
+  <text x="20" y="314" font-size="14" font-weight="700" fill="currentColor">② 추론 — test 멤버별 보정 후 픽셀 평균</text>
+
+  <!-- yhat wire top -->
+  <path d="M 105 336 L 105 326 L 825 326 L 825 336" stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <path d="M 595 326 L 595 336" stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="330" y="322" font-size="11.5" fill="var(--muted)">ŷ_k (조건 + 가산 기준)</text>
+
+  <rect x="20" y="336" width="170" height="62" rx="9" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.3"/>
+  <text x="105" y="361" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">test 멤버 ŷ_k</text>
+  <text x="105" y="381" text-anchor="middle" font-size="11.5" fill="var(--muted)">k = 1 … 8 (MC-8)</text>
+
+  <rect x="20" y="428" width="170" height="50" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="105" y="458" text-anchor="middle" font-size="12.5" fill="currentColor">context C 5장</text>
+
+  <rect x="252" y="336" width="188" height="62" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="346" y="361" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">결정적 초기 노이즈 z_k</text>
+  <text x="346" y="381" text-anchor="middle" font-size="11.5" fill="var(--muted)">시드 = f(샘플명, k, 1253)</text>
+
+  <rect x="500" y="336" width="190" height="62" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="595" y="361" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">R로 DDIM 40스텝</text>
+  <text x="595" y="381" text-anchor="middle" font-size="11.5" fill="var(--muted)">η = 0 (완전 결정적) → r̂_k</text>
+
+  <rect x="750" y="336" width="150" height="62" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="825" y="361" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">잔차 가산</text>
+  <text x="825" y="381" text-anchor="middle" font-size="12" fill="var(--muted)">x̃_k = ŷ_k + r̂_k</text>
+
+  <rect x="640" y="452" width="260" height="58" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="770" y="476" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">멤버 평균 x̄ = (1/8) Σ x̃_k</text>
+  <text x="770" y="495" text-anchor="middle" font-size="11.5" fill="var(--muted)">= 최종 예측 · “8 members refined mean”</text>
+
+  <g stroke="currentColor" stroke-width="1.3" fill="none">
+    <line x1="190" y1="367" x2="250" y2="367" marker-end="url(#ar)"/>
+    <line x1="440" y1="367" x2="498" y2="367" marker-end="url(#ar)"/>
+    <line x1="690" y1="367" x2="748" y2="367" marker-end="url(#ar)"/>
+    <path d="M 190 453 L 560 453 L 560 400" marker-end="url(#ar)"/>
+    <path d="M 825 398 L 825 450" marker-end="url(#ar)"/>
+  </g>
+  <text x="204" y="361" font-size="11" fill="var(--muted)">ŷ_k</text>
+  <text x="452" y="361" font-size="11" fill="var(--muted)">z_k</text>
+  <text x="702" y="361" font-size="11" fill="var(--muted)">r̂_k</text>
+  <text x="838" y="430" font-size="11" fill="var(--muted)">k = 1..8 반복</text>
+  <text x="240" y="447" font-size="11.5" fill="var(--muted)">context C (조건 입력)</text>
+</svg>
+<figcaption>그림 1 — 학습(①)과 추론(②)의 데이터 흐름. 파란 상자는 동결된 Stage 1의 산출물, 앰버 상자가 본 문서의 대상이다. 학습·추론 모두 Stage 1은 역전파에 관여하지 않으며, 두 단계는 디스크의 덤프 파일로만 연결된다.</figcaption>
+</figure>
+
+<dl class="kv">
+  <dt>단계 간 계약</dt><dd>Stage 1이 train/valid/test 전 분할을 DDIM-40·EMA로 추론해 멤버별 <span class="path">.pt</span>(float32, (1,512,512), [−1,1] 정규화)로 저장. 파일명 = 예측 대상 시각</dd>
+  <dt>페어링</dt><dd>보정기는 덤프 파일명에서 offset을 역산해 원본 저장소에서 context 5장(+학습 시 GT)을 스스로 찾음 — 별도 메타데이터 불필요</dd>
+  <dt>지평선 처리</dt><dd>t+1 ~ t+4(30~120분) 각각 <strong>별도의 보정기</strong>를 학습 (오차 특성이 지평선마다 체계적으로 다르므로)</dd>
+</dl>
+
+<h2 id="s3">3. 수학적 정식화</h2>
+<p class="sub">표준 DDPM 프레임워크를 "잔차"라는 신호에 적용한 것 — 수식 구조 자체는 교과서와 동일</p>
+
+<h3>3.1 잔차 확산의 학습 목표</h3>
+<p>GT 프레임 x, 베이스 멤버 예측 ŷ에 대해 잔차 <code>r = x − ŷ</code>를 확산의 "데이터"로 삼는다. 선형 스케줄의 표준 forward 과정으로 잔차에 노이즈를 입히고:</p>
+<div class="formula">
+x_t = √ᾱ_t · r + √(1 − ᾱ_t) · ε,&nbsp;&nbsp;&nbsp;ε ~ N(0, I),&nbsp;&nbsp;ᾱ_t = ∏ (1 − β_s),&nbsp;&nbsp;β: 1e-4 → 2e-2 (linear, T = 1000)
+</div>
+<p>네트워크 R은 노이즈 ε이 아니라 <strong>깨끗한 잔차 r 자체를 직접 예측</strong>한다 (x0-파라미터화):</p>
+<div class="formula">
+ℒ = 𝔼<sub>t, ε</sub> ‖ R(x_t, C, ŷ, t, d, h, ℓ) − r ‖²&nbsp;&nbsp;&nbsp;(C: context 5장, d·h: 대상 시각의 날짜·시각, ℓ: lead 인덱스)
+</div>
+<p><strong>왜 ε-예측이 아니라 x0-예측인가.</strong> 잔차는 0 근방의 저에너지 신호라서 예측 목표의 스케일이 작고 안정적이며, 검증 지표(잔차 x0-MSE)가 곧 학습 목표가 되어 모델 선택이 단순해진다. 또 아래 DDIM 갱신식에 예측값이 그대로 대입되므로 샘플링 코드도 간결하다. SNR 가중이나 v-파라미터화 같은 장치는 사용하지 않는다 — 잔차 신호에는 순수 MSE로 충분했다.</p>
+
+<h3>3.2 추론: 결정적 DDIM</h3>
+<p>초기 노이즈 z에서 출발해 η=0 DDIM으로 40스텝(1000스텝을 25 간격으로 성김) 역과정을 수행한다. 매 스텝 R이 r̂₀를 예측하면:</p>
+<div class="formula">
+ε̂ = ( x_t − √ᾱ_t · r̂₀ ) / √(1 − ᾱ_t)<br>
+x_{t′} = √ᾱ_{t′} · r̂₀ + √(1 − ᾱ_{t′}) · ε̂&nbsp;&nbsp;&nbsp;(t′ = 다음 성긴 스텝, η = 0 → 확률항 없음)<br>
+최종 출력: x̃ = ŷ + r̂&nbsp;&nbsp;&nbsp;(마지막 스텝의 r̂₀)
+</div>
+<p>η=0이므로 <strong>초기 노이즈 z가 정해지면 출력이 완전히 결정</strong>된다. z는 (샘플명, 멤버 인덱스, 기준 시드 1253)에서 해시로 파생하므로, 파이프라인 전체가 재실행 시 비트 단위로 재현된다. 모델의 본성은 확률적(잔차의 분포를 학습)이지만, 운용은 결정적이다.</p>
+
+<h2 id="s4">4. 아키텍처 해부</h2>
+<p class="sub">총 2,252,769 파라미터 (코드로 실측) · 어텐션 없음 · 체크포인트 ≈9MB</p>
+
+<figure>
+<svg viewBox="0 0 980 560" role="img" aria-label="RefinementUNet 구조. 7채널 입력 스택이 3레벨 인코더로 512에서 64 해상도까지 압축되고, 미드 블록을 거쳐 스킵 연결과 함께 디코더로 복원되며, zero-init 출력 conv가 잔차를 낸다. 상단의 세 임베더(timestep, 계절, lead)의 합이 모든 ResBlock에 가산 주입된다.">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <!-- conditioning strip -->
+  <rect x="20" y="20" width="196" height="58" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="118" y="43" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">TimestepEmbedder</text>
+  <text x="118" y="62" text-anchor="middle" font-size="11" fill="var(--muted)">t → 정현파 256 → MLP</text>
+
+  <rect x="248" y="20" width="212" height="58" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="354" y="43" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">SeasonalEmbedder</text>
+  <text x="354" y="62" text-anchor="middle" font-size="11" fill="var(--muted)">(day, hour) → cos/sin 4 → MLP</text>
+
+  <rect x="492" y="20" width="170" height="58" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="577" y="43" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">LeadTimeEmbedder</text>
+  <text x="577" y="62" text-anchor="middle" font-size="11" fill="var(--muted)">ℓ → MLP</text>
+
+  <circle cx="706" cy="49" r="15" fill="none" stroke="currentColor" stroke-width="1.3"/>
+  <text x="706" y="54" text-anchor="middle" font-size="15" fill="currentColor">+</text>
+
+  <rect x="756" y="23" width="204" height="52" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+  <text x="858" y="44" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">조건 벡터 c ∈ ℝ²⁵⁶</text>
+  <text x="858" y="63" text-anchor="middle" font-size="11" fill="var(--muted)">모든 ResBlock에 가산(shift) 주입</text>
+
+  <g stroke="currentColor" stroke-width="1.2" fill="none">
+    <path d="M 216 49 L 689 49" marker-end="url(#ar2)"/>
+    <path d="M 460 49 L 689 49"/>
+    <path d="M 662 49 L 689 49"/>
+    <line x1="721" y1="49" x2="754" y2="49" marker-end="url(#ar2)"/>
+  </g>
+  <path d="M 858 75 L 858 108 L 500 108" stroke="var(--accent)" stroke-width="1.2" fill="none" stroke-dasharray="4 4" marker-end="url(#ar2)"/>
+  <text x="640" y="102" font-size="11" fill="var(--accent)">c — 인코더·미드·디코더 전 블록으로</text>
+
+  <!-- input -->
+  <rect x="20" y="150" width="204" height="74" rx="9" fill="var(--blue-soft)" stroke="var(--blue)" stroke-width="1.3"/>
+  <text x="122" y="174" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">입력 스택 (채널 결합)</text>
+  <text x="122" y="193" text-anchor="middle" font-size="11.5" fill="var(--muted)">x_t(1) + C(5) + ŷ(1) = 7ch</text>
+  <text x="122" y="211" text-anchor="middle" font-size="11.5" fill="var(--muted)">@ 512×512 · stem Conv3×3</text>
+
+  <!-- encoder -->
+  <rect x="272" y="150" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="367" y="172" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Enc L1 · 32ch @512²</text>
+  <text x="367" y="191" text-anchor="middle" font-size="11" fill="var(--muted)">ResBlock ×2</text>
+
+  <rect x="272" y="248" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="367" y="270" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Enc L2 · 64ch @256²</text>
+  <text x="367" y="289" text-anchor="middle" font-size="11" fill="var(--muted)">ResBlock ×2</text>
+
+  <rect x="272" y="346" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="367" y="368" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Enc L3 · 128ch @128²</text>
+  <text x="367" y="387" text-anchor="middle" font-size="11" fill="var(--muted)">ResBlock ×2</text>
+
+  <rect x="400" y="452" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="495" y="474" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Mid · 128ch @64²</text>
+  <text x="495" y="493" text-anchor="middle" font-size="11" fill="var(--muted)">ResBlock ×1</text>
+
+  <!-- decoder -->
+  <rect x="530" y="346" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="625" y="368" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Dec · 64ch @128²</text>
+  <text x="625" y="387" text-anchor="middle" font-size="11" fill="var(--muted)">up + skip결합 + ResBlock ×2</text>
+
+  <rect x="530" y="248" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="625" y="270" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Dec · 32ch @256²</text>
+  <text x="625" y="289" text-anchor="middle" font-size="11" fill="var(--muted)">up + skip결합 + ResBlock ×2</text>
+
+  <rect x="530" y="150" width="190" height="54" rx="9" fill="var(--surface)" stroke="currentColor" stroke-width="1.1"/>
+  <text x="625" y="172" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">Dec · 32ch @512²</text>
+  <text x="625" y="191" text-anchor="middle" font-size="11" fill="var(--muted)">up + skip결합 + ResBlock ×2</text>
+
+  <!-- output -->
+  <rect x="768" y="140" width="192" height="74" rx="9" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+  <text x="864" y="163" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">출력 (zero-init)</text>
+  <text x="864" y="182" text-anchor="middle" font-size="11" fill="var(--muted)">GN → SiLU → Conv3×3 → r̂₀ (1ch)</text>
+  <text x="864" y="201" text-anchor="middle" font-size="11" fill="var(--muted)">가중치·편향 0으로 초기화</text>
+  <text x="864" y="240" text-anchor="middle" font-size="12" fill="currentColor">최종: x̃ = ŷ + r̂₀</text>
+
+  <!-- flow arrows -->
+  <g stroke="currentColor" stroke-width="1.3" fill="none">
+    <line x1="224" y1="177" x2="270" y2="177" marker-end="url(#ar2)"/>
+    <line x1="367" y1="204" x2="367" y2="246" marker-end="url(#ar2)"/>
+    <line x1="367" y1="302" x2="367" y2="344" marker-end="url(#ar2)"/>
+    <path d="M 367 400 L 367 479 L 398 479" marker-end="url(#ar2)"/>
+    <path d="M 590 479 L 625 479 L 625 402" marker-end="url(#ar2)"/>
+    <line x1="625" y1="344" x2="625" y2="304" marker-end="url(#ar2)"/>
+    <line x1="625" y1="246" x2="625" y2="206" marker-end="url(#ar2)"/>
+    <line x1="720" y1="177" x2="766" y2="177" marker-end="url(#ar2)"/>
+  </g>
+  <text x="340" y="230" font-size="10.5" fill="var(--muted)">↓ stride-2 conv</text>
+  <text x="340" y="328" font-size="10.5" fill="var(--muted)">↓ stride-2 conv</text>
+  <text x="636" y="330" font-size="10.5" fill="var(--muted)">↑ bilinear + conv</text>
+  <text x="636" y="232" font-size="10.5" fill="var(--muted)">↑ bilinear + conv</text>
+
+  <!-- skips -->
+  <g stroke="currentColor" stroke-width="1.1" fill="none" stroke-dasharray="5 4">
+    <line x1="462" y1="170" x2="528" y2="170" marker-end="url(#ar2)"/>
+    <line x1="462" y1="268" x2="528" y2="268" marker-end="url(#ar2)"/>
+    <line x1="462" y1="366" x2="528" y2="366" marker-end="url(#ar2)"/>
+  </g>
+  <text x="470" y="162" font-size="10.5" fill="var(--muted)">skip 32ch</text>
+  <text x="470" y="260" font-size="10.5" fill="var(--muted)">skip 64ch</text>
+  <text x="470" y="358" font-size="10.5" fill="var(--muted)">skip 128ch</text>
+</svg>
+<figcaption>그림 2 — RefinementUNet 아키텍처. 3레벨 U-Net(base 32ch, 배율 1·2·4)으로 512²→64²까지 압축 후 스킵 연결과 함께 복원한다. 상단 조건 브랜치(t·계절·lead)의 합 c가 모든 ResBlock에 가산 주입되고, 출력 conv는 zero-init으로 "보정량 0"에서 학습을 시작한다.</figcaption>
+</figure>
+
+<h3>4.1 입력 구성 — 조건화는 두 갈래</h3>
+<ul>
+  <li><strong>공간(이미지) 조건 → 채널 결합.</strong> 노이즈 낀 잔차 x_t(1ch) + context 5장 + 베이스 예측 ŷ(1ch) = <strong>7채널</strong>을 그대로 쌓아 stem conv에 넣는다. 별도 인코더 없음. ŷ가 입력에 포함되는 것이 핵심 — "무엇을 얼마나 고칠지"는 ŷ를 봐야 알 수 있다.</li>
+  <li><strong>스칼라 조건 → 임베딩 가산.</strong> 확산 timestep t(정현파+2층 MLP), 대상 시각의 계절성(day-of-year·hour를 cos/sin 4차원으로 주기 인코딩 후 MLP), lead 인덱스(MLP)의 세 임베딩을 <strong>합산</strong>해 256차원 벡터 c 하나로 만들고, 모든 ResBlock에 주입한다.</li>
+</ul>
+
+<h3>4.2 ResBlock — DDPM 표준형 + 가산 조건</h3>
+<pre><code>h   = Conv3×3( SiLU( GroupNorm(x) ) )
+h   = h + Linear( SiLU(c) )        ← 조건 벡터를 채널별 shift로 가산 (γ 없는 FiLM, DDPM 관례)
+h   = Conv3×3( SiLU( GroupNorm(h) ) )
+out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1×1)</code></pre>
+<p>조건 주입이 <strong>채널 단위·공간 균일</strong>이라는 점에 유의 — SPADE류의 픽셀별 변조는 쓰지 않는다. 공간 정보는 전적으로 7채널 입력 결합이 담당한다.</p>
+
+<h3>4.3 그 외 설계 선택</h3>
+<ul>
+  <li><strong>다운샘플 = stride-2 conv, 업샘플 = bilinear 보간 + conv.</strong> transposed conv 대신 보간+conv를 써서 격자(checkerboard) 아티팩트를 차단 — 잔차가 고주파 신호라 아티팩트에 민감하다.</li>
+  <li><strong>어텐션 없음.</strong> 잔차 보정은 국소적 과제라는 판단으로 순수 conv 구성. 이것이 2.25M 초경량의 주 요인.</li>
+  <li><strong>출력 conv zero-init.</strong> 학습 시작 시 r̂₀ ≡ 0 → x̃ = ŷ, 즉 <strong>항등 보정에서 출발</strong>. "보정기가 베이스보다 나빠질 수 없는" 하한을 학습 동역학에 내장한 장치다.</li>
+</ul>
+
+<h3>4.4 파라미터 예산 (실측)</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>구성요소</th><th class="num">파라미터</th><th>비고</th></tr></thead>
+<tbody>
+<tr><td>인코더 ResBlock (3레벨 × 2)</td><td class="num">810,048</td><td>32→64→128ch</td></tr>
+<tr><td>디코더 ResBlock (3레벨 × 2)</td><td class="num">459,264</td><td>skip 결합 포함</td></tr>
+<tr><td>미드 ResBlock</td><td class="num">328,576</td><td>128ch @64²</td></tr>
+<tr><td>다운/업샘플 conv</td><td class="num">387,520</td><td>193,760 × 2</td></tr>
+<tr><td>임베더 3종 (t·계절·lead)</td><td class="num">264,960</td><td>hidden 256</td></tr>
+<tr><td>stem + 출력부</td><td class="num">2,401</td><td>출력 conv는 zero-init</td></tr>
+<tr class="block-head"><td>합계</td><td class="num">2,252,769</td><td>베이스 확산 모델(122,672,577)의 약 1/54</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="s5">5. 학습 절차</h2>
+<p class="sub">Stage 1 동결 · 오프라인 pre-compute · 멤버 union · valid 기반 선택</p>
+<ol>
+  <li><strong>오프라인 pre-compute.</strong> 동결된 Stage 1로 train/valid/test 전 분할을 미리 추론해 멤버별 덤프를 저장한다. Stage 1이 동결이므로 매 epoch 재추론과 등가이면서 E배의 중복 forward를 없앤다. 학습 중 Stage 1로의 역전파는 없다.</li>
+  <li><strong>멤버-union 학습.</strong> train 분할의 8개 멤버 각각을 독립 학습쌍으로 사용 — 타임스탬프당 8쌍, t+1 기준 총 45,392쌍. 하나의 보정기가 "베이스가 만들 수 있는 다양한 예측"의 오차 분포를 폭넓게 본다.</li>
+  <li><strong>모델 선택.</strong> valid 8멤버 union의 잔차 x0-MSE(= 학습 목표와 동일한 프록시)가 최저인 epoch을 <span class="path">best_R.pt</span>로 선택. 매 epoch 체크포인트도 보존(개당 ≈9MB). 검증 풀은 <code>--val_members</code>로 학습과 독립적으로 좁힐 수 있다: <code>first</code>를 주면 <span class="path">member_0</span> 하나로만 검증해 에폭당 검증 비용이 1/K로 준다 — val MSE는 단일 멤버의 수천 샘플 평균만으로도 안정적이어서 best 선택에 미치는 영향은 미미하다. (2026-08-24 현재 진행 중인 12멤버 union 재학습이 이 member_0 단독 검증을 사용)</li>
+</ol>
+<div class="tablewrap">
+<table>
+<thead><tr><th>하이퍼파라미터</th><th>값</th><th>하이퍼파라미터</th><th>값</th></tr></thead>
+<tbody>
+<tr><td>epoch</td><td>30</td><td>optimizer</td><td>AdamW (weight decay 1e-4)</td></tr>
+<tr><td>batch</td><td>4</td><td>학습률</td><td>1e-4 → cosine, warmup 10ep, min 1e-6</td></tr>
+<tr><td>grad clip</td><td>1.0</td><td>정밀도</td><td>fp32 (AMP 미사용)</td></tr>
+<tr><td>EMA</td><td>미사용</td><td>t 샘플링</td><td>배치마다 U{0..999} 균등</td></tr>
+</tbody>
+</table>
+</div>
+<div class="note">
+<strong>프록시-최종지표 역전 주의.</strong> 잔차 x0-MSE는 학습·선택용 프록시일 뿐이다. 실제 실험에서 valid-분할 학습 변형(V)이 프록시에서는 더 좋았지만(0.0169 vs 0.0232) 최종 샘플링 지표에서는 전부 열세였던 사례가 있다 — 최종 판단은 반드시 DDIM 샘플링 후의 실제 지표(MSE·SSIM·FID·LPIPS·CRPS)로 한다.
+</div>
+
+<h2 id="s6">6. 추론과 앙상블 집계</h2>
+<ul>
+  <li><strong>멤버별 보정 → 평균 (채택 방식).</strong> test 멤버 8개를 각각 DDIM-40으로 보정한 뒤 픽셀 평균 — 표준 명칭 <strong>"8 members refined mean"</strong>. 앙상블의 다양성(확률성)은 Stage 1의 MC 샘플링이 전담하고, 보정기는 각 멤버를 같은 규칙으로 손보므로 멤버 간 분포 구조가 유지된다 → fair CRPS까지 개선.</li>
+  <li><strong>비교용 변형: 평균 선(先)보정 ("MC8 mean refined").</strong> 멤버 평균을 1회만 보정하는 방식. 4개 지평선 전부 정확도(MSE·SSIM·CRPS) 열세, 지각 지표(FID·LPIPS)만 개선 — 채택되지 않음(9절).</li>
+  <li><strong>재현성 계약.</strong> 초기 노이즈 시드 = f(샘플명, 멤버 k, base 1253), η=0. 병렬 샤딩 시에도 같은 시드 규약을 유지해 단일 실행과 비트 동일한 출력을 보장.</li>
+  <li><strong>출력.</strong> 타임스탬프당 1장, (1,512,512), [−1,1] 정규화 <span class="path">.pt</span>. 물리 단위 복원은 <code>x_raw = (x+1)/2·(max−min)+min</code>.</li>
+</ul>
+
+<h2 id="s7">7. 통상적 확산 모델과의 차이</h2>
+<p class="sub">비교 기준 두 가지: 교과서 DDPM, 그리고 같은 파이프라인의 Stage 1 베이스 확산 모델</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>항목</th><th>통상적 확산 / Stage 1 베이스</th><th>RefinementUNet</th></tr></thead>
+<tbody>
+<tr><td><strong>확산의 대상</strong></td><td>데이터(이미지) 자체 — 순수 노이즈에서 미래 프레임을 생성</td><td><strong>잔차 r = x − ŷ</strong> — 베이스 예측 없이는 정의조차 안 되는 종속 신호</td></tr>
+<tr><td>파라미터화 / 손실</td><td>ε-예측 또는 v-예측 + SNR 가중 (베이스: v-pred, min-SNR)</td><td>x0-예측 + 순수 MSE (가중 없음)</td></tr>
+<tr><td>노이즈 스케줄</td><td>베이스: Otsu 마스크로 구름/지형 <strong>영역 분리 β</strong> (픽셀별)</td><td>단일 linear β — 영역 개념 없음</td></tr>
+<tr><td>Guidance</td><td>베이스: CFG 기구 내장 (p_uncond, guidance scale)</td><td>없음</td></tr>
+<tr><td>조건 증강</td><td>베이스: c_aug = 과거 5장 + Otsu 마스크 + soft 마스크 + α_t·σ_t 채널</td><td>context 5장 + ŷ 그대로 결합 — 마스크/계수 채널 없음</td></tr>
+<tr><td>백본</td><td>베이스: 6레벨 · base 64ch · 멀티헤드 어텐션 + CBAM · <strong>122.7M</strong></td><td>3레벨 · base 32ch · 어텐션 없음 · <strong>2.25M (1/54)</strong></td></tr>
+<tr><td>학습 안정화 장치</td><td>베이스: EMA, AMP, x0 보조 헤드 옵션</td><td>없음 — fp32 + zero-init 항등 출발로 충분</td></tr>
+<tr><td>추론의 확률성</td><td>시드마다 다른 샘플을 만드는 것이 목적 (MC 앙상블)</td><td>결정적 시드 + η=0 → 재현 가능한 고정 보정</td></tr>
+<tr><td>실패 모드의 하한</td><td>없음 — 나쁜 샘플이 나올 수 있음</td><td>zero-init 덕분에 학습 초기 = 무보정(ŷ 그대로) 하한</td></tr>
+</tbody>
+</table>
+</div>
+<p>요약하면 확산의 <em>수학</em>은 표준의 단순화판이고(특수 장치 전부 제거), 확산의 <em>대상과 조건</em>이 다르다. "일반적인 디퓨전이냐"는 질문에 대한 정확한 답: <strong>프레임워크는 일반적, 적용은 일반적이지 않다.</strong></p>
+
+<h2 id="s8">8. "디퓨전 두 개"가 아닌 이유</h2>
+<p class="sub">생성 확산 모델을 단순히 직렬로 두 번 쓰는 것과의 차별 요소 5가지</p>
+
+<h3>8.1 모델링 대상의 분해 — 역할이 다른 두 분포</h3>
+<p>Stage 1은 <code>p(x | C)</code> — 관측 조건에서 미래가 어떻게 될지의 분포 — 를 학습한다. Stage 2는 <code>p(r | ŷ, C)</code> — <strong>Stage 1이 만든 특정 예측의 오차가 어떤 구조인지</strong>의 분포 — 를 학습한다. 두 번째 모델은 예보 과제를 다시 푸는 것이 아니라, 첫 모델의 체계적 결함(경계 블러, 밝기 오프셋, 유한 스텝 오차)을 과제로 삼는다. 생성 확산을 두 번 직렬하면 두 번째 모델이 같은 과제를 중복 학습하게 되고, 이 분해가 사라진다.</p>
+
+<h3>8.2 잔차 신호의 통계적 이점 — 1/54 크기로 충분한 이유</h3>
+<p>잔차는 0 근방에 집중된 저에너지·희소 신호다(오차는 구름 경계 등 일부 영역에 몰림). 이미지 전체의 분포를 담으려면 122.7M급 용량이 필요했지만, 오차 분포는 2.25M으로 담긴다. "디퓨전 하나 더"가 아니라 <strong>1/54 비용의 전문화된 소형 모델</strong>이라는 점이 실용적 차별점이다 (학습 30 epoch, 추론도 40스텝 × 소형망).</p>
+
+<h3>8.3 항등 하한 — 망칠 수 없게 설계된 두 번째 단계</h3>
+<p>보정은 가산(x̃ = ŷ + r̂)이고 출력 conv가 zero-init이므로, 학습 0스텝 시점의 보정기는 정확히 항등 함수다. 즉 두 번째 단계는 <strong>"아무것도 안 하는 것"에서 출발해 이득이 있는 방향으로만 이탈</strong>한다. 두 번째 생성 확산이 이미지를 처음부터 다시 그리면 이런 하한이 없다 — 베이스가 이미 맞춘 부분을 얼마든지 훼손할 수 있다.</p>
+
+<h3>8.4 앙상블 의미의 보존</h3>
+<p>확률성의 소재가 명확히 분리된다: <strong>다양성은 Stage 1의 MC 샘플링에서만</strong> 나오고, Stage 2는 각 멤버에 결정적(시드 고정) 보정을 가한다. 그 결과 멤버 간 산포가 보존되어 앙상블 확률 지표(fair CRPS)가 훼손되지 않고 오히려 개선된다(t+4에서 −16%). 두 번째 생성 확산이 멤버를 재샘플링하면 Stage 1이 학습한 앙상블 분포가 뒤섞여 이 해석이 무너진다.</p>
+
+<h3>8.5 기존 캐스케이드 확산과의 위치 구분</h3>
+<p>확산 모델을 직렬로 쌓는 선행 사례(SR3, Cascaded Diffusion Models 류의 초해상 캐스케이드)는 각 스테이지가 저해상 출력을 조건으로 <em>전체 이미지를 다시 생성</em>하는 완전한 생성기다. 본 구조는 ① 동일 해상도에서 ② 잔차만 샘플링해 ③ 동결된 예측에 더하는 <strong>보정기</strong>라는 점에서 다르며, ④ 두 단계가 end-to-end가 아니라 파일 계약으로 분리되어 보정기만 독립적으로 교체·재학습할 수 있다(베이스 재학습 불필요).</p>
+
+<h2 id="s9">9. 실험 결과 요약</h2>
+<p class="sub">test 4,079장(t+1 기준) · SSIM은 [0,1]/L=1 관례 · CRPS는 멤버 기반 fair (점예보인 mean refined는 MAE)</p>
+<div class="note">
+<strong>⏳ 진행 중인 재실험 (2026-08-24).</strong> 앙상블을 12멤버로 확장한 union 재학습(<code>--train_members all --val_members first</code>, member_0 단독 검증 — §5 참조)이 진행되고 있다. 아래 표는 8멤버(30ep-era) 기준 확정치이며, 12멤버 결과가 확정되면 이 표와 함께 갱신 예정.
+</div>
+<div class="tablewrap">
+<table>
+<thead><tr><th>지평선 / 방법</th><th class="num">MSE ↓</th><th class="num">SSIM ↑</th><th class="num">FID ↓</th><th class="num">LPIPS ↓</th><th class="num">CRPS ↓</th></tr></thead>
+<tbody>
+<tr class="block-head"><td colspan="6">t+1 (30분)</td></tr>
+<tr><td>DAD (MC8) — 무보정 평균</td><td class="num">0.0234</td><td class="num">—</td><td class="num">43.0</td><td class="num">—</td><td class="num">0.0706</td></tr>
+<tr><td>MC8 mean refined</td><td class="num">0.0296</td><td class="num">—</td><td class="num best">36.2</td><td class="num best">0.335</td><td class="num">—</td></tr>
+<tr><td>8 members refined mean</td><td class="num best">0.0233</td><td class="num">0.6499</td><td class="num">51.7</td><td class="num">0.372</td><td class="num best">0.0661</td></tr>
+<tr class="block-head"><td colspan="6">t+2 (60분)</td></tr>
+<tr><td>DAD (MC8)</td><td class="num">0.0338</td><td class="num">0.6201</td><td class="num">86.1</td><td class="num">0.4362</td><td class="num">0.0895</td></tr>
+<tr><td>MC8 mean refined</td><td class="num">0.0438</td><td class="num">0.5646</td><td class="num best">42.8</td><td class="num best">0.4069</td><td class="num">(MAE 0.1296)</td></tr>
+<tr><td>8 members refined mean</td><td class="num">0.0338</td><td class="num">0.6193</td><td class="num">97.9</td><td class="num">0.4378</td><td class="num best">0.0834</td></tr>
+<tr class="block-head"><td colspan="6">t+3 (90분)</td></tr>
+<tr><td>DAD (MC8)</td><td class="num">0.0463</td><td class="num">0.6008</td><td class="num">135.3</td><td class="num best">0.4728</td><td class="num">0.1069</td></tr>
+<tr><td>MC8 mean refined</td><td class="num">0.0586</td><td class="num">0.5427</td><td class="num best">54.7</td><td class="num">0.4575</td><td class="num">(MAE 0.1555)</td></tr>
+<tr><td>8 members refined mean</td><td class="num best">0.0447</td><td class="num best">0.6031</td><td class="num">129.4</td><td class="num">0.4739</td><td class="num best">0.1013</td></tr>
+<tr class="block-head"><td colspan="6">t+4 (120분)</td></tr>
+<tr><td>DAD (MC8)</td><td class="num">0.0548</td><td class="num best">0.5932</td><td class="num">170.8</td><td class="num">0.4869</td><td class="num">0.1176</td></tr>
+<tr><td>MC8 mean refined</td><td class="num">0.0686</td><td class="num">0.5273</td><td class="num best">168.0</td><td class="num">0.4967</td><td class="num">(MAE 0.1737)</td></tr>
+<tr><td>8 members refined mean</td><td class="num best">0.0486</td><td class="num">0.5867</td><td class="num">174.3</td><td class="num best">0.4746</td><td class="num best">0.0991</td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+  <li><strong>지평선 단조성:</strong> 베이스 오차가 클수록(지평선이 길수록) 멤버별 보정의 이득이 커진다 — t+1 동률 → t+2 CRPS만 → t+3 대부분 → t+4에서 MSE −11%·CRPS −16%.</li>
+  <li><strong>순서의 교훈:</strong> "평균 후 보정"(mean refined)은 지각 지표 전용, "보정 후 평균"(members refined mean)이 정확도·확률 지표에서 우월 — 보정을 앙상블 안쪽(멤버 단위)에 두는 설계 근거.</li>
+  <li>FID는 표본 수·입력 폴더에 민감하므로(500장 캡 시 43→79 인플레이션) 비교 시 반드시 (폴더, n)을 명시.</li>
+</ul>
+
+<h2 id="s10">10. 재현 정보</h2>
+<dl class="kv">
+  <dt>코드</dt><dd><a href="https://github.com/HollyRiver/DiffusionRefiner">github.com/HollyRiver/DiffusionRefiner</a> (포터블 모듈 전체, private) · 로컬 <span class="path">/DATA/shinsung/refiner_module/</span> — <span class="path">refiner/unet.py</span>(모델·스케줄·DDIM), <span class="path">train_refiner.py</span>, <span class="path">infer_refiner.py</span>, <span class="path">config.py</span>, README(입력 계약·적응 가이드). 의존성 torch·numpy뿐</dd>
+  <dt>계보</dt><dd>자체 ST-DiT 실험 라인의 <span class="path">refinement_unet.py</span> → baseline_ver03 이식 → 포터블 모듈화. 협업 저장소(DiffusionIrradiancePrediction)와 코드 공유 없음 (git 전 이력 확인)</dd>
+  <dt>학습 명령</dt><dd><code>python train_refiner.py --mode member --train_members all --offset N --gpu 0</code></dd>
+  <dt>추론 명령</dt><dd><code>python infer_refiner.py --mode member --offset N --gpu 0 --save_members</code></dd>
+  <dt>체크포인트</dt><dd><span class="path">{work_dir}/refiner_tN_member/best_R.pt</span> (+ 매 epoch <span class="path">ep{N}_R.pt</span>)</dd>
+  <dt>시드</dt><dd>학습·추론 base 1253; 2-GPU 샤드 추론 시 5253으로 단일 실행과 시드 정렬</dd>
+  <dt>데이터 계약</dt><dd>덤프 <span class="path">{split}/member_XX/{YYYY-MM-DD_HHMM}.pt</span> (m11, 파일명=대상 시각) + 원본 <span class="path">.npy</span> 디렉토리 (min 0, max 26.347150802612, 30분 간격)</dd>
+</dl>
+
+<footer class="doc">
+  RefinementUNet 기술 문서 · 2026-08-24 · 수치·코드 근거: /DATA/shinsung 작업공간 (파라미터 수는 코드 실측). 파이프라인 전체 개요는 별도 문서 “DAD–Refiner 파이프라인” 참조.
+</footer>
+</div>
+
+</body>
+</html>
