@@ -53,13 +53,20 @@ python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 
 **모드 B 변형 — train/val에도 멤버가 전부 있는 경우 (`--train_members all`)**
 모든 멤버를 union으로 학습합니다(타임스탬프당 멤버 수만큼 학습 샘플, val도 동일 확장).
+검증 풀은 `--val_members`로 학습과 독립적으로 좁힐 수 있습니다: `first`를 주면
+member_0 하나로만 검증해 에폭당 검증 비용이 1/K로 줄고, val MSE는 단일 멤버의
+수천 샘플 평균만으로도 안정적이라 best 선택에 미치는 영향은 미미합니다.
 추론은 모드 B와 같습니다(멤버 각각 보정 → 평균). 에폭당 데이터가 멤버 수배가 되므로
 `--epochs`/`--warmup_epochs`를 그에 맞게 줄이는 것을 권장합니다.
 
 ```bash
-python train_refiner.py --mode member --train_members all --offset 1 --gpu 0 --epochs 12 --warmup_epochs 4
+python train_refiner.py --mode member --train_members all --val_members first --offset 1 --gpu 0 --epochs 12 --warmup_epochs 4
 python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 ```
+
+> ⏳ **진행 중 (2026-08-24)**: 앙상블을 12멤버로 확장한 union 재학습이 바로 이 조합
+> (`--train_members all --val_members first`, member_0 단독 검증)으로 진행되고 있습니다.
+> 결과가 확정되면 기술 문서의 결과 표와 함께 갱신 예정.
 
 주의: 변형(예: first vs all)마다 체크포인트 폴더명이 같으므로(`refiner_t{N}_member`)
 **실험별로 `--work_dir`를 분리**하세요.
