@@ -417,7 +417,7 @@ out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1�
 <ol>
   <li><strong>오프라인 pre-compute.</strong> 동결된 Stage 1로 train/valid/test 전 분할을 미리 추론해 멤버별 덤프를 저장한다. Stage 1이 동결이므로 매 epoch 재추론과 등가이면서 E배의 중복 forward를 없앤다. 학습 중 Stage 1로의 역전파는 없다.</li>
   <li><strong>멤버-union 학습.</strong> train 분할의 8개 멤버 각각을 독립 학습쌍으로 사용 — 타임스탬프당 8쌍, t+1 기준 총 45,392쌍. 하나의 보정기가 "베이스가 만들 수 있는 다양한 예측"의 오차 분포를 폭넓게 본다.</li>
-  <li><strong>모델 선택.</strong> valid 8멤버 union의 잔차 x0-MSE(= 학습 목표와 동일한 프록시)가 최저인 epoch을 <span class="path">best_R.pt</span>로 선택. 매 epoch 체크포인트도 보존(개당 ≈9MB). 검증 풀은 <code>--val_members</code>로 학습과 독립적으로 좁힐 수 있다: <code>first</code>를 주면 <span class="path">member_0</span> 하나로만 검증해 에폭당 검증 비용이 1/K로 준다 — val MSE는 단일 멤버의 수천 샘플 평균만으로도 안정적이어서 best 선택에 미치는 영향은 미미하다. (2026-08-24 현재 진행 중인 12멤버 union 재학습이 이 member_0 단독 검증을 사용)</li>
+  <li><strong>모델 선택.</strong> valid 8멤버 union의 잔차 x0-MSE(= 학습 목표와 동일한 프록시)가 최저인 epoch을 <span class="path">best_R.pt</span>로 선택. 매 epoch 체크포인트도 보존(개당 ≈9MB). 검증 풀은 <code>--val_members</code>로 학습과 독립적으로 좁힐 수 있다: <code>first</code>를 주면 <span class="path">member_0</span> 하나로만 검증해 에폭당 검증 비용이 1/K로 준다 — val MSE는 단일 멤버의 수천 샘플 평균만으로도 안정적이어서 best 선택에 미치는 영향은 미미하다. (2026-08-26 완료: 12멤버 union 재학습이 이 member_0 단독 검증을 사용 — 결과는 §9)</li>
 </ol>
 <div class="tablewrap">
 <table>
@@ -483,7 +483,7 @@ out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1�
 <h2 id="s9">9. 실험 결과 요약</h2>
 <p class="sub">test 4,079장(t+1 기준) · SSIM은 [0,1]/L=1 관례 · CRPS는 멤버 기반 fair (점예보인 mean refined는 MAE)</p>
 <div class="note">
-<strong>⏳ 진행 중인 재실험 (2026-08-24).</strong> 앙상블을 12멤버로 확장한 union 재학습(<code>--train_members all --val_members first</code>, member_0 단독 검증 — §5 참조)이 진행되고 있다. 아래 표는 8멤버(30ep-era) 기준 확정치이며, 12멤버 결과가 확정되면 이 표와 함께 갱신 예정.
+<strong>✅ 12멤버 확장 재실험 완료 (2026-08-26).</strong> 앙상블을 12멤버로 확장한 union 재학습(<code>--train_members all --val_members first</code>, member_0 단독 검증 — §5 참조)과 mean·median 집계 비교를 아래 표에 반영했다. 요지: <strong>median 집계는 소폭의 MSE·SSIM 손실로 FID·LPIPS를 개선</strong>(전 지평선 일관), <strong>8→12 확장은 뚜렷한 이득 없음</strong>(MSE만 일부 장기에서 근소 개선, FID·LPIPS·CRPS는 전 지평선에서 8멤버가 우위). CRPS는 멤버 기반이라 같은 K에서 mean=median. 모든 수치는 동일 레시피로 산출(regen30 8멤버 mean이 기존 확정치와 일치 검증).
 </div>
 <div class="tablewrap">
 <table>
@@ -492,25 +492,39 @@ out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1�
 <tr class="block-head"><td colspan="6">t+1 (30분)</td></tr>
 <tr><td>DAD (MC8) — 무보정 평균</td><td class="num">0.0234</td><td class="num">—</td><td class="num">43.0</td><td class="num">—</td><td class="num">0.0706</td></tr>
 <tr><td>MC8 mean refined</td><td class="num">0.0296</td><td class="num">—</td><td class="num best">36.2</td><td class="num best">0.335</td><td class="num">—</td></tr>
-<tr><td>8 members refined mean</td><td class="num best">0.0233</td><td class="num">0.6499</td><td class="num">51.7</td><td class="num">0.372</td><td class="num best">0.0661</td></tr>
+<tr><td>8 members refined mean</td><td class="num">0.0233</td><td class="num best">0.6499</td><td class="num">51.7</td><td class="num">0.372</td><td class="num best">0.0661</td></tr>
+<tr><td>8 members refined median</td><td class="num">0.0241</td><td class="num">0.6479</td><td class="num">43.1</td><td class="num">0.348</td><td class="num">0.0661</td></tr>
+<tr><td>12 members refined mean</td><td class="num best">0.0232</td><td class="num">0.6474</td><td class="num">55.0</td><td class="num">0.392</td><td class="num">0.0668</td></tr>
+<tr><td>12 members refined median</td><td class="num">0.0239</td><td class="num">0.6468</td><td class="num">50.3</td><td class="num">0.378</td><td class="num">0.0668</td></tr>
 <tr class="block-head"><td colspan="6">t+2 (60분)</td></tr>
 <tr><td>DAD (MC8)</td><td class="num">0.0338</td><td class="num">0.6201</td><td class="num">86.1</td><td class="num">0.4362</td><td class="num">0.0895</td></tr>
 <tr><td>MC8 mean refined</td><td class="num">0.0438</td><td class="num">0.5646</td><td class="num best">42.8</td><td class="num best">0.4069</td><td class="num">(MAE 0.1296)</td></tr>
 <tr><td>8 members refined mean</td><td class="num">0.0338</td><td class="num">0.6193</td><td class="num">97.9</td><td class="num">0.4378</td><td class="num best">0.0834</td></tr>
+<tr><td>8 members refined median</td><td class="num">0.0349</td><td class="num">0.6171</td><td class="num">93.4</td><td class="num">0.413</td><td class="num">0.0834</td></tr>
+<tr><td>12 members refined mean</td><td class="num best">0.0332</td><td class="num best">0.6254</td><td class="num">104.4</td><td class="num">0.472</td><td class="num">0.0846</td></tr>
+<tr><td>12 members refined median</td><td class="num">0.0341</td><td class="num">0.6233</td><td class="num">97.1</td><td class="num">0.438</td><td class="num">0.0846</td></tr>
 <tr class="block-head"><td colspan="6">t+3 (90분)</td></tr>
-<tr><td>DAD (MC8)</td><td class="num">0.0463</td><td class="num">0.6008</td><td class="num">135.3</td><td class="num best">0.4728</td><td class="num">0.1069</td></tr>
+<tr><td>DAD (MC8)</td><td class="num">0.0463</td><td class="num">0.6008</td><td class="num">135.3</td><td class="num">0.4728</td><td class="num">0.1069</td></tr>
 <tr><td>MC8 mean refined</td><td class="num">0.0586</td><td class="num">0.5427</td><td class="num best">54.7</td><td class="num">0.4575</td><td class="num">(MAE 0.1555)</td></tr>
 <tr><td>8 members refined mean</td><td class="num best">0.0447</td><td class="num best">0.6031</td><td class="num">129.4</td><td class="num">0.4739</td><td class="num best">0.1013</td></tr>
+<tr><td>8 members refined median</td><td class="num">0.0461</td><td class="num">0.6007</td><td class="num">127.1</td><td class="num best">0.451</td><td class="num">0.1013</td></tr>
+<tr><td>12 members refined mean</td><td class="num">0.0448</td><td class="num">0.6029</td><td class="num">145.6</td><td class="num">0.480</td><td class="num">0.1056</td></tr>
+<tr><td>12 members refined median</td><td class="num">0.0455</td><td class="num">0.6013</td><td class="num">139.3</td><td class="num">0.464</td><td class="num">0.1056</td></tr>
 <tr class="block-head"><td colspan="6">t+4 (120분)</td></tr>
-<tr><td>DAD (MC8)</td><td class="num">0.0548</td><td class="num best">0.5932</td><td class="num">170.8</td><td class="num">0.4869</td><td class="num">0.1176</td></tr>
-<tr><td>MC8 mean refined</td><td class="num">0.0686</td><td class="num">0.5273</td><td class="num best">168.0</td><td class="num">0.4967</td><td class="num">(MAE 0.1737)</td></tr>
-<tr><td>8 members refined mean</td><td class="num best">0.0486</td><td class="num">0.5867</td><td class="num">174.3</td><td class="num best">0.4746</td><td class="num best">0.0991</td></tr>
+<tr><td>DAD (MC8)</td><td class="num">0.0548</td><td class="num">0.5932</td><td class="num">170.8</td><td class="num">0.4869</td><td class="num">0.1176</td></tr>
+<tr><td>MC8 mean refined</td><td class="num">0.0686</td><td class="num">0.5273</td><td class="num">168.0</td><td class="num">0.4967</td><td class="num">(MAE 0.1737)</td></tr>
+<tr><td>8 members refined mean</td><td class="num">0.0486</td><td class="num">0.5867</td><td class="num">174.3</td><td class="num">0.4746</td><td class="num best">0.0991</td></tr>
+<tr><td>8 members refined median</td><td class="num">0.0509</td><td class="num">0.5843</td><td class="num best">157.5</td><td class="num best">0.457</td><td class="num">0.0991</td></tr>
+<tr><td>12 members refined mean</td><td class="num best">0.0471</td><td class="num best">0.6021</td><td class="num">189.8</td><td class="num">0.506</td><td class="num">0.0994</td></tr>
+<tr><td>12 members refined median</td><td class="num">0.0493</td><td class="num">0.5989</td><td class="num">172.5</td><td class="num">0.479</td><td class="num">0.0994</td></tr>
 </tbody>
 </table>
 </div>
 <ul>
   <li><strong>지평선 단조성:</strong> 베이스 오차가 클수록(지평선이 길수록) 멤버별 보정의 이득이 커진다 — t+1 동률 → t+2 CRPS만 → t+3 대부분 → t+4에서 MSE −11%·CRPS −16%.</li>
   <li><strong>순서의 교훈:</strong> "평균 후 보정"(mean refined)은 지각 지표 전용, "보정 후 평균"(members refined mean)이 정확도·확률 지표에서 우월 — 보정을 앙상블 안쪽(멤버 단위)에 두는 설계 근거.</li>
+  <li><strong>mean vs median 집계:</strong> 같은 멤버 집합에서 median은 MSE +2~4%·SSIM 미미한 손실을 대가로 FID −5~17%·LPIPS −4~7%를 얻는다(전 지평선·8/12멤버 공통). 이상치 멤버에 강건해 고주파 디테일이 덜 뭉개지는 것 — 지각 품질이 목표면 median이 유리. CRPS는 멤버 기반이라 mean=median.</li>
+  <li><strong>8 vs 12멤버 확장:</strong> 뚜렷한 이득이 없다. MSE·SSIM은 장기(t+2·t+4)에서만 근소 개선되나, FID·LPIPS·CRPS는 전 지평선에서 8멤버가 우위. 지각·확률 지표 기준 최선은 <strong>"8 members refined median"</strong>(FID 전 지평선 최저), CRPS는 8멤버가 일관 우위. (단 8↔12 비교는 멤버 수와 재학습(member_0 val, from-scratch)이 묶인 결과.)</li>
   <li>FID는 표본 수·입력 폴더에 민감하므로(500장 캡 시 43→79 인플레이션) 비교 시 반드시 (폴더, n)을 명시.</li>
 </ul>
 

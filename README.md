@@ -64,9 +64,11 @@ python train_refiner.py --mode member --train_members all --val_members first --
 python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 ```
 
-> ⏳ **진행 중 (2026-08-24)**: 앙상블을 12멤버로 확장한 union 재학습이 바로 이 조합
-> (`--train_members all --val_members first`, member_0 단독 검증)으로 진행되고 있습니다.
-> 결과가 확정되면 기술 문서의 결과 표와 함께 갱신 예정.
+> ✅ **완료 (2026-08-26)**: 앙상블을 12멤버로 확장한 union 재학습(이 조합
+> `--train_members all --val_members first`, member_0 단독 검증)과 mean·median 집계
+> 비교를 완료했습니다. 결론 — **median 집계는 소폭의 정확도 손실로 FID·LPIPS를 개선**하고,
+> **8→12 확장은 뚜렷한 이득이 없습니다**(FID·LPIPS·CRPS는 8멤버가 우위). 전체 결과 표는
+> [기술 문서 §9](https://hollyriver.github.io/DiffusionRefiner/#s9)를 참고하세요.
 
 주의: 변형(예: first vs all)마다 체크포인트 폴더명이 같으므로(`refiner_t{N}_member`)
 **실험별로 `--work_dir`를 분리**하세요.
