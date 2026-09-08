@@ -10,6 +10,7 @@ ParseDtFromName 의 정규식을 수정한다. config.CFG["filename_format"] 도
 from __future__ import annotations
 
 import hashlib
+import random
 import re
 from datetime import datetime
 from pathlib import Path
@@ -85,6 +86,26 @@ def seed_from_name(base_seed, name):
     """(base_seed, 샘플명) -> 결정적 32bit 시드 (재실행 시 동일 출력 보장용)."""
     h = hashlib.sha1((str(name) + str(base_seed)).encode()).hexdigest()
     return int(h[:8], 16)
+
+
+def set_seed(seed, deterministic=False):
+    """학습 재현성을 위한 전역 시드 설정.
+
+    학습에서 난수가 들어오는 지점은 4곳이다 — 모델 초기화, DataLoader shuffle,
+    확산 타임스텝 t 추출, 노이즈 추출. **모델을 만들기 전에** 호출해야 초기화까지 고정된다.
+
+    deterministic=True 면 cuDNN의 비결정 커널까지 차단해 비트 단위 재현에 가까워지지만
+    느려진다. 기본(False)에서도 같은 시드면 실질적으로 동일한 학습 곡선이 나온다.
+    """
+    seed = int(seed)
+    random.seed(seed)
+    np.random.seed(seed % (2 ** 32))
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    if deterministic:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
 
 
 def ensure_dir(path):

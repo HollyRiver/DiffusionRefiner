@@ -52,17 +52,34 @@ python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 ```
 
 **모드 B 변형 — train/val에도 멤버가 전부 있는 경우 (`--train_members all`)**
-모든 멤버를 union으로 학습합니다(타임스탬프당 멤버 수만큼 학습 샘플, val도 동일 확장).
-검증 풀은 `--val_members`로 학습과 독립적으로 좁힐 수 있습니다: `first`를 주면
+모든 멤버를 union으로 학습합니다(타임스탬프당 멤버 수만큼 학습 샘플).
+검증 풀은 `--val_members`로 **학습과 독립적으로** 정합니다: `first`를 주면
 member_0 하나로만 검증해 에폭당 검증 비용이 1/K로 줄고, val MSE는 단일 멤버의
 수천 샘플 평균만으로도 안정적이라 best 선택에 미치는 영향은 미미합니다.
 추론은 모드 B와 같습니다(멤버 각각 보정 → 평균). 에폭당 데이터가 멤버 수배가 되므로
 `--epochs`/`--warmup_epochs`를 그에 맞게 줄이는 것을 권장합니다.
 
+`--expect_members K`를 함께 주세요. dumps의 split 폴더가 실제 멤버 폴더로의 심링크인
+구성에서는 그 대상에 멤버가 추가되면 **에러 없이 K가 바뀝니다**. K를 표에 쓰는 실험에서는
+발견된 멤버 수가 기대와 다를 때 즉시 중단시키는 편이 안전합니다(종료코드 1).
+
 ```bash
-python train_refiner.py --mode member --train_members all --val_members first --offset 1 --gpu 0 --epochs 12 --warmup_epochs 4
+python train_refiner.py --mode member --train_members all --val_members first \
+    --expect_members 8 --offset 1 --gpu 0 --epochs 12 --warmup_epochs 4
 python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
 ```
+
+> ⚠️ **2026-09-08 동작 변경 2건** (재현성 수정)
+>
+> 1. `--val_members all`이 이제 실제로 전 멤버 검증을 합니다. 이전 구현은
+>    `train_members == "all"`일 때만 `all`을 인정해, **기본값 조합**
+>    (`--train_members first` + `--val_members all`)에서 조용히 member_0 단독 검증을
+>    했습니다. 플래그를 명시해 온 런(`--train_members all --val_members first` 등)의
+>    동작과 과거 결과 해석은 바뀌지 않습니다.
+> 2. 검증의 확산 타임스텝·노이즈가 **매 epoch 고정 추출**로 바뀌었습니다. 이전에는 매
+>    epoch 새로 뽑아 val 값에 샘플링 노이즈가 섞였고, `best_R.pt` 선택이 그 노이즈에
+>    좌우될 수 있었습니다(모델은 그대로인데 쉬운 t가 뽑힌 epoch이 best가 되는 식).
+>    옛 동작은 `--val_stochastic`.
 
 > ✅ **완료 (2026-08-26)**: 앙상블을 12멤버로 확장한 union 재학습(이 조합
 > `--train_members all --val_members first`, member_0 단독 검증)과 mean·median 집계
@@ -82,6 +99,17 @@ epoch)와 함께 기본값으로 **매 epoch `ep{에폭}_R.pt`가 저장됩니�
 나중에 필요해질 수 있으므로 끄지 않기를 권장합니다.
 
 horizon이 여러 개면 `--offset 1..4`를 각각 실행하세요 (horizon마다 별도 refiner).
+
+## 재현성
+
+`--seed`(기본 `config.py: seed`)가 학습 난수 4곳을 모두 고정합니다 — **모델 초기화**,
+DataLoader shuffle, 확산 타임스텝 `t`, 노이즈. 같은 시드·같은 설정이면 체크포인트
+가중치가 비트 단위로 일치합니다(검증됨). 비트 단위 재현을 더 강하게 원하면
+`--cudnn_deterministic`(느려짐)을 추가하세요.
+
+호출 CLI 전문은 `{work_dir}/refiner_t{N}_{mode}/train_cmd.txt`에 실행마다 append됩니다.
+나중에 "이 체크포인트가 어떤 설정으로 나왔는지"를 역산하지 않으려면 이 파일을
+체크포인트와 함께 보관하세요.
 
 ## 검증
 

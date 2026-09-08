@@ -417,7 +417,8 @@ out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1�
 <ol>
   <li><strong>오프라인 pre-compute.</strong> 동결된 Stage 1로 train/valid/test 전 분할을 미리 추론해 멤버별 덤프를 저장한다. Stage 1이 동결이므로 매 epoch 재추론과 등가이면서 E배의 중복 forward를 없앤다. 학습 중 Stage 1로의 역전파는 없다.</li>
   <li><strong>멤버-union 학습.</strong> train 분할의 8개 멤버 각각을 독립 학습쌍으로 사용 — 타임스탬프당 8쌍, t+1 기준 총 45,392쌍. 하나의 보정기가 "베이스가 만들 수 있는 다양한 예측"의 오차 분포를 폭넓게 본다.</li>
-  <li><strong>모델 선택.</strong> valid 8멤버 union의 잔차 x0-MSE(= 학습 목표와 동일한 프록시)가 최저인 epoch을 <span class="path">best_R.pt</span>로 선택. 매 epoch 체크포인트도 보존(개당 ≈9MB). 검증 풀은 <code>--val_members</code>로 학습과 독립적으로 좁힐 수 있다: <code>first</code>를 주면 <span class="path">member_0</span> 하나로만 검증해 에폭당 검증 비용이 1/K로 준다 — val MSE는 단일 멤버의 수천 샘플 평균만으로도 안정적이어서 best 선택에 미치는 영향은 미미하다. (2026-08-26 완료: 12멤버 union 재학습이 이 member_0 단독 검증을 사용 — 결과는 §9)</li>
+  <li><strong>모델 선택.</strong> valid 8멤버 union의 잔차 x0-MSE(= 학습 목표와 동일한 프록시)가 최저인 epoch을 <span class="path">best_R.pt</span>로 선택. 매 epoch 체크포인트도 보존(개당 ≈9MB). 검증 풀은 <code>--val_members</code>로 학습과 독립적으로 좁힐 수 있다: <code>first</code>를 주면 <span class="path">member_0</span> 하나로만 검증해 에폭당 검증 비용이 1/K로 준다 — val MSE는 단일 멤버의 수천 샘플 평균만으로도 안정적이어서 best 선택에 미치는 영향은 미미하다. (2026-08-26 완료: 12멤버 union 재학습이 이 member_0 단독 검증을 사용 — 결과는 §9)
+  <br><strong>⚠️ 2026-09-08 동작 수정 2건.</strong> ① <code>--val_members all</code>이 이전에는 <code>--train_members all</code>과 함께 줄 때만 인정돼, 기본값 조합에서 조용히 member_0 단독 검증을 했다(플래그를 명시해 온 §9 재실험 등은 영향 없음). ② 검증의 확산 타임스텝·노이즈를 <strong>매 epoch 고정 추출</strong>로 바꿨다 — 이전에는 매 epoch 새로 뽑아 val 값에 샘플링 노이즈가 섞였고, 모델이 나아지지 않았는데 쉬운 t가 뽑힌 epoch이 <span class="path">best_R.pt</span>가 될 여지가 있었다(옛 동작은 <code>--val_stochastic</code>). 두 수정 모두 <em>앞으로의</em> 학습에 적용되며 §9 표의 값은 그대로다.</li>
 </ol>
 <div class="tablewrap">
 <table>
@@ -532,10 +533,14 @@ out = h + skip(x)                   (입출력 채널이 다르면 skip = Conv1�
 <dl class="kv">
   <dt>코드</dt><dd><a href="https://github.com/HollyRiver/DiffusionRefiner">github.com/HollyRiver/DiffusionRefiner</a> (공개 리포 — 이 문서의 웹 사본: <a href="https://hollyriver.github.io/DiffusionRefiner/">hollyriver.github.io/DiffusionRefiner</a>) · 로컬 <span class="path">/DATA/shinsung/refiner_module/</span> — <span class="path">refiner/unet.py</span>(모델·스케줄·DDIM), <span class="path">train_refiner.py</span>, <span class="path">infer_refiner.py</span>, <span class="path">config.py</span>, README(입력 계약·적응 가이드). 의존성 torch·numpy뿐</dd>
   <dt>계보</dt><dd>자체 ST-DiT 실험 라인의 <span class="path">refinement_unet.py</span> → baseline_ver03 이식 → 포터블 모듈화. 협업 저장소(DiffusionIrradiancePrediction)와 코드 공유 없음 (git 전 이력 확인)</dd>
-  <dt>학습 명령</dt><dd><code>python train_refiner.py --mode member --train_members all --offset N --gpu 0</code></dd>
+  <dt>학습 명령</dt><dd><code>python train_refiner.py --mode member --train_members all --val_members first --expect_members 8 --save_every 1 --seed 1253 --offset N --gpu 0</code> (§9의 12멤버 재실험은 <code>--expect_members 12</code>)</dd>
   <dt>추론 명령</dt><dd><code>python infer_refiner.py --mode member --offset N --gpu 0 --save_members</code></dd>
   <dt>체크포인트</dt><dd><span class="path">{work_dir}/refiner_tN_member/best_R.pt</span> (+ 매 epoch <span class="path">ep{N}_R.pt</span>)</dd>
-  <dt>시드</dt><dd>학습·추론 base 1253; 2-GPU 샤드 추론 시 5253으로 단일 실행과 시드 정렬</dd>
+  <dt>시드</dt><dd>추론 base 1253 (샘플명별 파생); 2-GPU 샤드 추론 시 5253으로 단일 실행과 시드 정렬.
+    <strong>학습 시드는 2026-09-08부터</strong> <code>--seed</code>(기본 1253)로 지원 — 모델 초기화·DataLoader
+    shuffle·확산 t·노이즈를 모두 고정하며 같은 시드면 가중치가 비트 단위로 일치한다.
+    ⚠️ <strong>그 이전에 학습된 체크포인트(§9의 표를 산출한 것들 포함)는 시드 없이 학습되어 정확히 재현되지 않는다</strong>
+    — 재학습하면 같은 설정에서도 값이 조금 달라진다</dd>
   <dt>데이터 계약</dt><dd>덤프 <span class="path">{split}/member_XX/{YYYY-MM-DD_HHMM}.pt</span> (m11, 파일명=대상 시각) + 원본 <span class="path">.npy</span> 디렉토리 (min 0, max 26.347150802612, 30분 간격)</dd>
 </dl>
 
