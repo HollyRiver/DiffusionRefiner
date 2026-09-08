@@ -100,6 +100,22 @@ epoch)와 함께 기본값으로 **매 epoch `ep{에폭}_R.pt`가 저장됩니�
 
 horizon이 여러 개면 `--offset 1..4`를 각각 실행하세요 (horizon마다 별도 refiner).
 
+## 멀티-GPU 추론 (선택)
+
+테스트 세트를 strided로 쪼개 GPU마다 한 프로세스씩 돌릴 수 있습니다. 초기 노이즈 시드가
+**샘플명 기반**(`seed_from_name(base_seed + 1000*k, name)`)이라 샤드 구성이 결과에 영향을
+주지 않습니다 — 샤드 합집합이 단일 실행과 비트 단위로 동일함을 확인했습니다.
+
+```bash
+# GPU 0, 1 에 각각
+python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members --shards 2 --shard 0
+python infer_refiner.py --mode member --offset 1 --gpu 1 --save_members --shards 2 --shard 1
+```
+
+`--shard`는 `[0, --shards)` 범위여야 하며 벗어나면 중단합니다(종료코드 1). 검사가 없으면
+파이썬 슬라이스가 에러 없이 다른 샤드와 겹치는 구간을 돌려주어, 일부 샘플이 두 번 계산되고
+일부는 누락된 채 조용히 끝납니다. `--work_dir`는 샤드별로 분리하고, 채점 전에 합치세요.
+
 ## 재현성
 
 `--seed`(기본 `config.py: seed`)가 학습 난수 4곳을 모두 고정합니다 — **모델 초기화**,

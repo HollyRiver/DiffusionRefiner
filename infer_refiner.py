@@ -59,6 +59,10 @@ def main():
     ap.add_argument("--save_members", action="store_true",
                     help="(mode=member) 멤버별 보정본도 저장")
     ap.add_argument("--max_samples", type=int, default=None)
+    ap.add_argument("--shards", type=int, default=1,
+                    help="split test items into N strided shards for multi-GPU (seed is per "
+                         "sample-name so shards give bit-identical output to a single run)")
+    ap.add_argument("--shard", type=int, default=0, help="which shard index [0..N-1] this process runs")
     args = ap.parse_args()
 
     device = resolve_device(args.gpu)
@@ -99,6 +103,16 @@ def main():
             f"(README '적응 가이드').")
     if args.max_samples is not None:
         items = items[:args.max_samples]
+    if args.shards > 1:
+        # 경계 검사 필수: shard >= shards 면 파이썬 슬라이스가 에러 없이 다른 샤드와
+        # 겹치는 구간을 돌려준다 (12개일 때 items[5::2] == items[1::2] 의 후반부).
+        # 그러면 일부 샘플이 두 번 계산되고 일부는 아예 빠진 채 조용히 끝난다.
+        if not (0 <= args.shard < args.shards):
+            raise SystemExit(
+                f"[abort] --shard {args.shard} 는 [0, {args.shards}) 범위여야 한다. "
+                f"범위를 벗어나면 다른 샤드와 겹치거나 누락된 커버리지로 조용히 끝난다.")
+        items = items[args.shard::args.shards]
+        print(f"[shard]  {args.shard}/{args.shards}: {len(items)} items")
     ds = MultiRefinerDataset(items, CFG["data_min"], CFG["data_max"], args.dump_value_range)
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
                         num_workers=args.num_workers, collate_fn=multi_collate,
