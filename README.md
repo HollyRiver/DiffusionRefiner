@@ -130,8 +130,10 @@ DataLoader shuffle, 확산 타임스텝 `t`, 노이즈. 같은 시드·같은 �
 ## 전체 흐름도
 
 필요한 데이터·환경, 단계(덤프 연결 → 학습 → 추론 → 집계 → 채점 → 표·그림), 산출물의 아카이브 위치,
-시작 지점별 시나리오를 한 장에 정리했습니다: [`diagram/pipeline_flow.png`](diagram/pipeline_flow.png)
+시작 지점별 시나리오를 한 장에 정리했습니다: [`pipeline_flow.png`](pipeline_flow.png)
 (다시 그리기: `python diagram/make_pipeline_flow.py`)
+
+![refiner_module 파이프라인 흐름도](pipeline_flow.png)
 
 ## 채점 (정본 수치 산출 파일)
 

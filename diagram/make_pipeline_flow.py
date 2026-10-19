@@ -1,6 +1,6 @@
 """refiner_module 파이프라인 흐름도 (pipeline_flow.png) 생성 스크립트.
 
-    python diagram/make_pipeline_flow.py      # → diagram/pipeline_flow.png
+    python diagram/make_pipeline_flow.py      # → pipeline_flow.png (README.md 와 같은 최상위 폴더)
 
 matplotlib 만 사용(CPU). 내용(경로·명령)을 고칠 때는 아래 텍스트만 바꾸면 된다.
 """
@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
-OUT = Path(__file__).resolve().parent / "pipeline_flow.png"
+OUT = Path(__file__).resolve().parents[1] / "pipeline_flow.png"
 SANS = ["Noto Sans CJK JP", "DejaVu Sans"]
 MONO = ["DejaVu Sans Mono", "Noto Sans CJK JP"]
 
