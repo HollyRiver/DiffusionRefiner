@@ -1,6 +1,6 @@
 """Ensemble-level MAE (m11 space) for the K=8 canonical prediction sets, per horizon.
 
-Convention (matches /DATA/shinsung/forecast_metrics_eval_fid500.py mse_m11):
+Convention (matches forecast_metrics_eval_fid500.py mse_m11 in this folder):
   per-image mean over pixels in [-1,1] space, NO clipping (range_policy=report_only),
   then plain average over images.  MAE = mean|pred - target| computed the same way.
 MSE is recomputed alongside as a cross-check against the canonical metrics_summary.json.

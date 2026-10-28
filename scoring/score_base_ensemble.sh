@@ -7,7 +7,7 @@ set -u
 GPU="$1"; shift
 PY=/home/user/miniconda3/envs/wind_power/bin/python
 IO=/DATA/shinsung/inference_outputs
-MET=/DATA/shinsung/forecast_metrics_eval_fid500.py
+MET="$(cd "$(dirname "$0")" && pwd)/forecast_metrics_eval_fid500.py"   # 같은 폴더의 정본 채점기
 for spec in "$@"; do
   IFS=: read -r H K <<<"$spec"
   MEM="$IO/analysis/t$H/dumps_members12/test"

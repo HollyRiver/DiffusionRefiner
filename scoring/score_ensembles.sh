@@ -7,7 +7,7 @@ set -u
 GPU="$1"; CONF="$2"; shift 2
 PY=/home/user/miniconda3/envs/wind_power/bin/python
 IO=/DATA/shinsung/inference_outputs
-MET=/DATA/shinsung/forecast_metrics_eval_fid500.py
+MET="$(cd "$(dirname "$0")" && pwd)/forecast_metrics_eval_fid500.py"   # 같은 폴더의 정본 채점기
 for H in "$@"; do
   root="$IO/analysis/t$H"
   if [ "$CONF" = 8mem ]; then WORK="$root/work30_inf_best"; else WORK="$root/work_valm0_12_inf"; fi

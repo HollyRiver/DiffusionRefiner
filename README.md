@@ -1,6 +1,6 @@
-# Diffusion-Based Residual Generation Refiner (아마도?)
+# Diffusion-Based Residual Refiner
 
-&nbsp;베이스 예측 모델(DAD)의 추론 덤프를 입력으로, 잔차 확산(residual diffusion) Refiner를 학습하고 최종 보정 예측을 산출하는 자립형 모듈입니다. 올인원 리포지토리입니다. 또한, 설명의 대부분은 클로드 코드에 의해 작성되었습니다. 저도 아직 이해중입니다.
+&nbsp;베이스 예측 모델(DAD)의 추론 덤프를 입력으로, 잔차 확산(residual diffusion) Refiner를 학습하고 최종 보정 예측을 산출하는 자립형 모듈입니다. 올인원 리포지토리입니다.
 
 - 의존성: `torch`, `numpy` (그 외 없음)
 - 원리: `residual = GT − y_blur` 를 x0-파라미터화 확산으로 학습, 추론 시 DDIM으로

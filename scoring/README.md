@@ -3,9 +3,13 @@
 논문 표의 보정기 수치(K=8 정본)를 실제로 산출한 파일들을 **수정 없이** 모았다(원본과 sha256 동일, 2026-10-17 수집).
 파일 안의 경로는 연구 서버 절대경로 그대로다 — 다른 환경에서 쓰려면 경로만 바꾸면 된다.
 
+**2026-10-28 변경**: 서버 루트의 `/DATA/shinsung/forecast_metrics_eval_fid500.py`(이 폴더의 것과 sha256 동일)를 지웠다.
+그래서 `score_ensembles.sh`·`score_base_ensemble.sh` 의 `MET=` 한 줄만 **이 폴더의 채점기**를 가리키도록 바꿨다(그 밖의 줄과 채점기 자체는 원본 그대로).
+`compute_mae.py` 는 주석 한 줄만 바꿨다.
+
 | 파일 | 원래 위치 | 역할 |
 |---|---|---|
-| `forecast_metrics_eval_fid500.py` | `/DATA/shinsung/` | **정본 채점기** — MSE(m11)·SSIM(win7)·CRPS(fair)·LPIPS(alex)·FID(pytorch_fid 2048-d). CLI 또는 `compute_metrics()` |
+| `forecast_metrics_eval_fid500.py` | `/DATA/shinsung/` (2026-10-28 삭제, 이제 이 사본이 유일) | **정본 채점기** — MSE(m11)·SSIM(win7)·CRPS(fair)·LPIPS(alex)·FID(pytorch_fid 2048-d). CLI 또는 `compute_metrics()` |
 | `compute_mae.py` | `inference_outputs/analysis/mae/` | 앙상블 MAE (채점기에 MAE가 없어 따로 계산) |
 | `make_base_ens.py` | `inference_outputs/` | 보정 전 DAD 멤버 → 평균/median 앙상블 |
 | `make_median.py` | `inference_outputs/` | 보정 멤버(`refined_member_*`) → median 앙상블 |
