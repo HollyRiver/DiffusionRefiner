@@ -6,6 +6,8 @@
 **2026-10-28 변경**: 서버 루트의 `/DATA/shinsung/forecast_metrics_eval_fid500.py`(이 폴더의 것과 sha256 동일)를 지웠다.
 그래서 `score_ensembles.sh`·`score_base_ensemble.sh` 의 `MET=` 한 줄만 **이 폴더의 채점기**를 가리키도록 바꿨다(그 밖의 줄과 채점기 자체는 원본 그대로).
 `compute_mae.py` 는 주석 한 줄만 바꿨다.
+같은 날 채점 GT 를 `lon_refiner/ablation_vol_gOFF_lON_tH/test_outputs/target` 에서 **`inference_outputs/gt/tH`** 로 옮겨,
+`score_ensembles.sh`·`score_base_ensemble.sh`·`regen30_infer.sh`·`compute_mae.py` 의 GT 경로 한 줄씩을 새 위치로 바꿨다.
 
 | 파일 | 원래 위치 | 역할 |
 |---|---|---|
@@ -35,7 +37,7 @@
 | `inference_outputs/analysis/tH/dumps_members` | 그대로 (→ `base/tH/{train,valid,test}/members`) |
 | `inference_outputs/analysis/tH/dumps_members12` | 삭제됨(K=12). K=8 base 멤버 = `base/tH/test/members` |
 | `inference_outputs/make_*.py` | `inference_outputs/scripts_logs/` (그리고 이 폴더) |
-| GT `lon_refiner/ablation_vol_gOFF_lON_tH/test_outputs/target` | 그대로 |
+| GT `inference_outputs/gt/tH` (옛 `lon_refiner/ablation_vol_gOFF_lON_tH/test_outputs/target`) | 그대로 (2026-10-28 이동, 스크립트도 새 경로) |
 
 ## 채점 의존성 (검증된 버전)
 

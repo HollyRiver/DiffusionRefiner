@@ -166,11 +166,11 @@ I["raw"] = box(IX, S[1][1] + S[1][3] - 3.5, IW, "원시 위성 프레임", [
     "✘ 아카이브 밖",
 ], "in_out")
 I["gt"] = box(IX, S[4][1] + S[4][3] - 0.5, IW, "채점용 GT", [
-    "`lon_refiner/ablation_vol_gOFF_lON_t{H}/",
-    "`    test_outputs/target/{stem}.pt",
+    "`gt/t{H}/{stem}.pt",
+    "(1, 512, 512) float32, test 분할",
     "= 원시 프레임의 m11 정규화",
-    "✘ 아카이브 밖 (원시 프레임으로 재생성)",
-], "in_out")
+    "✔ 아카이브 안 (57G)",
+], "in_arch")
 I["env"] = box(IX, I["gt"][1] - 2.4, IW, "실행 환경 (env: wind_power)", [
     "학습·추론: torch, numpy",
     "채점: scikit-image, lpips, pytorch-fid,",
@@ -187,7 +187,7 @@ def left(b, f=0.5):
 arrow(right(I["dump"], 0.55), left(S[0], 0.55), color=C["in_arch"][1], lw=2.4)
 arrow(right(I["raw"], 0.62), left(S[1], 0.45), color=C["in_out"][1], lw=2.4, rad=-0.1)
 arrow(right(I["raw"], 0.35), left(S[2], 0.6), color=C["in_out"][1], lw=2.4, rad=0.1)
-arrow(right(I["gt"], 0.5), left(S[4], 0.6), color=C["in_out"][1], lw=2.4)
+arrow(right(I["gt"], 0.5), left(S[4], 0.6), color=C["in_arch"][1], lw=2.4)
 
 # ── 산출물 (오른쪽) ─────────────────────────────────────────────────────────
 OX, OW = 98, 40
@@ -289,7 +289,7 @@ for i, n in enumerate(notes):
     ax.text(NX + 0.8, TT - TH - 0.75 - 1.32 * (i + 0.5), n, fontsize=10, family=SANS, va="center")
 
 foot_y = TT - th - 1.6
-ax.text(138, foot_y, "생성: diagram/make_pipeline_flow.py  ·  2026-10-19 기준 (inference_outputs 아카이브 레이아웃)",
+ax.text(138, foot_y, "생성: diagram/make_pipeline_flow.py  ·  2026-10-28 기준 (inference_outputs 아카이브 레이아웃)",
         fontsize=9.5, family=SANS, ha="right", va="center", color="#777777")
 # 아래 빈 공간 잘라내기: 1 단위 = 0.2 inch 를 유지하도록 그림 높이도 함께 줄인다
 ymin = foot_y - 1.6

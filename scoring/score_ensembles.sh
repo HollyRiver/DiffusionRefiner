@@ -12,7 +12,7 @@ for H in "$@"; do
   root="$IO/analysis/t$H"
   if [ "$CONF" = 8mem ]; then WORK="$root/work30_inf_best"; else WORK="$root/work_valm0_12_inf"; fi
   OUT="$WORK/outputs_t${H}_member"
-  TGT="/DATA/shinsung/lon_refiner/ablation_vol_gOFF_lON_t${H}/test_outputs/target"
+  TGT="/DATA/shinsung/inference_outputs/gt/t${H}"
   if [ ! -d "$OUT/prediction" ]; then echo "[score $CONF gpu$GPU] t+$H MISSING $OUT"; continue; fi
   mkdir -p "$OUT/samples"
   for md in "$OUT"/refined_member_*; do

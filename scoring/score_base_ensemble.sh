@@ -12,7 +12,7 @@ for spec in "$@"; do
   IFS=: read -r H K <<<"$spec"
   MEM="$IO/analysis/t$H/dumps_members12/test"
   OUT="$IO/analysis/t$H/base_K$K"
-  TGT="/DATA/shinsung/lon_refiner/ablation_vol_gOFF_lON_t${H}/test_outputs/target"
+  TGT="/DATA/shinsung/inference_outputs/gt/t${H}"
   mkdir -p "$OUT"
   echo "[baseK gpu$GPU] t+$H K=$K AGG $(date '+%F %T')"
   $PY "$IO/make_base_ens.py" "$MEM" "$OUT" "$K" >> "$OUT/agg.log" 2>&1 \

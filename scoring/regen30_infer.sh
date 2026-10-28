@@ -21,7 +21,7 @@ if [ "$nmem" -ne 8 ]; then
   echo "[ERR] t+$H dumps_members/test 멤버 수=$nmem (기대 8). 착수 중단 — canonical은 8멤버."; exit 2
 fi
 # 완결성 스킵: 이미 target 수만큼 나온 경우 건너뜀
-ntgt=$(ls /DATA/shinsung/lon_refiner/ablation_vol_gOFF_lON_t${H}/test_outputs/target/*.pt 2>/dev/null | wc -l)
+ntgt=$(ls /DATA/shinsung/inference_outputs/gt/t${H}/*.pt 2>/dev/null | wc -l)
 npred=$(ls "$DONE"/*.pt 2>/dev/null | wc -l)
 if [ "$npred" -ge "$ntgt" ] && [ "$ntgt" -gt 0 ]; then
   echo "[skip] t+$H already complete ($npred/$ntgt)"; exit 0

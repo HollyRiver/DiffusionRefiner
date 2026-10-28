@@ -35,7 +35,7 @@ def main():
     a = ap.parse_args()
     H = a.H
     torch.set_num_threads(8)
-    tgt_dir = Path(f"/DATA/shinsung/lon_refiner/ablation_vol_gOFF_lON_t{H}/test_outputs/target")
+    tgt_dir = Path(f"/DATA/shinsung/inference_outputs/gt/t{H}")
     sets = sets_for(H)
     names = sorted(p.stem for p in tgt_dir.glob("*.pt"))
     for k, (d, _) in sets.items():
