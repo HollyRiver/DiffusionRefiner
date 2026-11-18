@@ -1,33 +1,31 @@
 # Diffusion-Based Residual Refiner
 
-&nbsp;베이스 예측 모델(DAD)의 추론 덤프를 입력으로, 잔차 확산(residual diffusion) Refiner를 학습하고 최종 보정 예측을 산출하는 자립형 모듈입니다. 올인원 리포지토리입니다.
+![파이프라인 전체 그림](pipeline.png)
 
-- 의존성: `torch`, `numpy` (그 외 없음)
-- 원리: `residual = GT − y_blur` 를 x0-파라미터화 확산으로 학습, 추론 시 DDIM으로
-  residual을 샘플링해 `y_sharp = y_blur + residual`
+&nbsp;한반도 일대 일사량을 디퓨전으로 예측하는 파이프라인의 보정 프로세스입니다. 베이스 모델 예측의 잔차를 생성하여 결과를 보정합니다. 문서 설명의 일부는 Claude Code에 의해 작성되었습니다.
 
-> 📖 **기술 문서**: 원리 · 수학적 정식화 · 아키텍처 해부 · 실험 결과를 다이어그램과
-> 함께 정리한 문서 — [RefinementUNet 기술 문서](https://hollyriver.github.io/DiffusionRefiner/)
->
-> ⭐ 연구에서 **채택된 방식은 member 모드** — 멤버별 보정 후 평균("8 members refined
-> mean")입니다. ensemble 모드(평균 후 1회 보정)는 비교 실험에서 정확도·확률 지표
-> (MSE·SSIM·CRPS) 열세로 채택되지 않았으며, 코드에는 비교·일반 용도로 남아 있습니다.
+- 의존성: `torch`, `numpy`
+- 핵심 원리: 잔차 `residual = GT − y_base`를 생성하는 x0-prediction diffusion 학습. 추론 시 DDIM으로 residual을 샘플링한 후, 합하여 보정 `y_refined = y_base + residual`
+- 보정기 학습 과정에서 한 예측 시점에 대하여 총 8개의 서로 다른 베이스 모델 잔차를 학습합니다. 잔차 분포 구조를 최대한 학습함으로써 확률적 예측을 효과적으로 보정할 수 있도록 만들어졌습니다.
 
-## 입력 계약
+> [📖 **기술 문서**](https://hollyriver.github.io/DiffusionRefiner/) (Claude Code로 제작됨)
+
+## 데이터 구조
 
 ```
 {dumps_root}/                      # config.py 또는 --dumps_root
 ├── train/member_00/2021-06-01_0600.pt    # 파일명 = "예측 대상" 타임스탬프
-│         member_01/...                   # 멤버 여러 개 = 앙상블 (1개만 있어도 OK)
+│         member_01/...                   # 멤버 여러 개 = 앙상블 (본 실험에서는 8개를 사용)
 ├── val/member_00/...                     # 검증용 (없으면 경고 후 진행)
 └── test/member_00/...                    # 최종 보정 대상
 
 {raw_data_dir}/2021-06-01_0600.npy        # 원본 프레임 (30분 간격 raw 값)
 ```
 
-- 덤프 `.pt`: shape `(1,H,W)` 또는 `(H,W)`, 값 범위 **m11** (`2*(x-min)/(max-min)-1`)
-- 원본 `.npy`: 물리 단위 raw 값. Refiner가 여기서 context 5장(+학습 시 GT)을 읽습니다.
-  **원본 프레임 디렉토리는 필수입니다** — 덤프만으로는 동작하지 않습니다.
+&nbsp;Base 모델 작업자에게서 계승된 설정입니다.
+
+- Base 모델 예측 덤프 `.pt`: shape `(1,H,W)` 또는 `(H,W)`, 값 범위 [-1, 1] (`2*(x-min)/(max-min)-1`)
+- 원본 일사량 `.npy`: 물리 단위 raw 값. 정규화되지 않음
 - horizon `--offset N`: 예측 시점이 마지막 context로부터 N프레임(=N×30분) 뒤라는 뜻
 
 ## 사용법
