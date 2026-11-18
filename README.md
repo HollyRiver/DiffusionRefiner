@@ -26,7 +26,6 @@
 
 - Base 모델 예측 덤프 `.pt`: shape `(1,H,W)` 또는 `(H,W)`, 값 범위 [-1, 1] (`2*(x-min)/(max-min)-1`)
 - 원본 일사량 `.npy`: 물리 단위 raw 값. 정규화되지 않음
-- horizon `--offset N`: 예측 시점이 마지막 context로부터 N프레임(=N×30분) 뒤라는 뜻
 
 ## 사용법
 
@@ -34,9 +33,9 @@
 test에서는 멤버 8개를 각각 보정한 뒤 평균해 최종 예측을 만듭니다.
 
 ```bash
-DUMPS=/path/to/dumps        # {split}/member_XX/{timestamp}.pt  (위 '데이터 구조')
-RAW=/path/to/raw_frames     # {timestamp}.npy
-WORK=./work/k8              # 실험마다 다른 폴더
+DUMPS=/path/to/dumps        # Base 모델 예측 덤프 위치: {split}/member_XX/{timestamp}.pt
+RAW=/path/to/raw_frames     # 원본 일사량 데이터 위치: {timestamp}.npy
+WORK=./work/k8              # 실험 결과 저장 폴더
 
 # 1) 학습
 python train_refiner.py --mode member --offset 1 \
@@ -121,20 +120,16 @@ python infer_refiner.py --mode member --offset 1 --save_members --gpu 1 --shards
 - 중단된 학습 이어하기: `--resume_ckpt ep{E}_R.pt --start_epoch {E} --init_best_val {기존 best의 val 손실}`
 - 재현성: `--cudnn_deterministic` (비트 단위 재현에 더 가깝게, 느려짐), `--val_stochastic` (검증 노이즈를 매 epoch 새로 뽑던 2026-09-08 이전 동작)
 
-## 전체 흐름도
-
-필요한 데이터·환경, 단계(덤프 연결 → 학습 → 추론 → 집계 → 채점 → 표·그림), 산출물의 아카이브 위치,
-시작 지점별 시나리오를 한 장에 정리했습니다: [`pipeline_flow.png`](pipeline_flow.png)
-(다시 그리기: `python diagram/make_pipeline_flow.py`)
-
-![refiner_module 파이프라인 흐름도](pipeline_flow.png)
-
 ## 채점 (정본 수치 산출 파일)
 
 논문 표의 수치를 만든 채점기·집계·실행 스크립트 원본 사본은 [`scoring/`](scoring/README.md)에 있습니다
 (채점 의존성: `scikit-image`, `lpips`, `pytorch-fid`).
 
-## 검증
+## 전체 흐름도
+
+![refiner_module 파이프라인 흐름도](pipeline_flow.png)
+
+## 모듈 유효성 검증
 
 데이터 없이 모듈 자체를 검증하려면 (CPU만으로 수 분):
 
@@ -144,22 +139,26 @@ python tests/test_utils.py
 python tests/test_dataset.py
 ```
 
-## ⭐ 적응 가이드 — 환경이 이 계약과 다를 때 고치는 곳
+## 적응 가이드 — 다른 데이터에 쓸 때
 
-| # | 다른 점 | 고치는 곳 |
-|---|---------|-----------|
-| 1 | 파일명 타임스탬프 규칙이 다름 (예: `20210601T0600.pt`) | `config.py: filename_format` (원본 프레임 파일명 생성용) + `refiner/utils.py: DT_FORMATS / ParseDtFromName` (덤프 파일명 파싱용) — **둘 다** 맞춰야 함 |
-| 2 | 멤버 폴더 이름이 `member_XX`가 아님 (예: `seed0/`) | `config.py: member_glob` (예: `"seed*"`). 패턴으로 안 되면 `refiner/dataset.py: discover_members` 한 함수만 수정 |
-| 3 | 덤프 값이 m11이 아니라 물리 단위(raw) | `config.py: dump_value_range = "raw"` (자동으로 m11 변환됨) |
-| 4 | 프레임 간격이 30분이 아님 / context 길이가 5가 아님 | `config.py: frame_interval_minutes`, `num_context` (context 길이 변경 시 재학습 필요 — 모델 입력 채널이 바뀜) |
-| 5 | 정규화 상수(min/max)가 다름 | `config.py: data_min`, `data_max` |
-| 6 | 원본 프레임이 `.npy`가 아님 (예: `.png`, `.nc`) | `refiner/dataset.py: _Base._load_raw_m11` 한 함수만 수정 (반환: m11 `(1,H,W)` 텐서) |
-| 7 | 덤프 파일명이 "예측 대상 시각"이 아니라 "발화(issue) 시각" | `refiner/dataset.py: build_items / build_multi_items` — `dt`를 target 시각으로 가정하고 context를 역산하므로, issue 시각이면 `target_dt = dt + offset*간격`으로 보정 후 사용 |
-| 8 | train/val 분할이 없고 통짜 폴더만 있음 | `{dumps_root}/train/member_00/`로 심볼릭 링크를 만들거나 폴더를 나눠서 계약에 맞추는 쪽을 권장 (코드 수정 불필요) |
+데이터가 위 "데이터 구조"와 다를 때만 보면 됩니다. 대부분 `config.py` 한 곳만 고치면 됩니다.
 
-수정 후에는 반드시 `python tests/run_smoke.py`로 모듈이 여전히 통과하는지,
-그리고 실데이터 소량(`--max_samples 8` 등)으로 `[items] built=...` 카운트가
-0이 아닌지 확인하세요. `built=0`이면 대부분 #1(파일명) 또는 #4(간격/offset) 불일치입니다.
+| # | 이런 경우 | 고칠 곳 |
+|---|---|---|
+| 1 | 파일명의 시각 형식이 다름 (예: `20210601T0600`) | 원본 프레임 이름: `config.py`의 `filename_format`<br>덤프 이름: `refiner/utils.py`의 `DT_FORMATS`에 형식 추가 |
+| 2 | 멤버 폴더 이름이 `member_XX`가 아님 (예: `seed0/`) | `config.py`의 `member_glob` (예: `"seed*"`)<br>번호는 두 자리로 맞추세요. 한 자리 번호로 10개를 넘으면 `member_1, member_10, member_2…` 순으로 정렬돼 보정본 번호가 어긋납니다 |
+| 3 | 덤프 값이 [-1, 1]이 아니라 물리 단위 | `config.py`의 `dump_value_range = "raw"` |
+| 4 | 프레임 간격이 30분이 아님, 또는 입력 프레임이 5장이 아님 | `config.py`의 `frame_interval_minutes`, `num_context` |
+| 5 | 정규화 min/max가 다름 | `config.py`의 `data_min`, `data_max` (베이스 모델이 덤프를 만들 때 쓴 값과 같아야 함) |
+| 6 | 원본 프레임이 `.npy`가 아님 | `refiner/dataset.py`의 `_Base._load_raw_m11` 함수 하나 (파일을 읽어 [-1, 1] 범위 `(1,H,W)` 텐서로 반환) |
+| 7 | 덤프 파일명이 예측 대상 시각이 아니라 예측을 만든 시각 | `refiner/dataset.py`의 `build_items`, `build_multi_items`에서 파일명 시각에 `offset × 간격`을 더해 대상 시각으로 바꾸기. **에러 없이 엉뚱한 정답과 짝지어지므로** 직접 확인하세요 |
+
+고친 뒤에는 학습을 짧게 돌려(`--epochs 1 --max_iters_per_epoch 2`) 로그의 `[items] ... built=` 숫자를 봅니다.
+0이거나 너무 적으면 같은 줄의 숫자로 원인을 찾을 수 있습니다.
+
+- `no_dt`가 많음: 덤프 파일명을 읽지 못함 → 1번(`DT_FORMATS`)
+- `miss_tgt`, `miss_ctx`가 많음: 원본 프레임을 찾지 못함 → 1번(`filename_format`) 또는 4번(간격)
+  (원본에 빠진 시각이 있으면 몇 개는 정상적으로 생깁니다)
 
 ## 학습 데이터가 어떻게 구성되는지 (참고)
 
