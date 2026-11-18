@@ -30,100 +30,96 @@
 
 ## 사용법
 
-먼저 `config.py`에서 `dumps_root` / `raw_data_dir` / `work_dir`를 설정하세요
-(또는 매번 CLI 인자로 지정).
-
-**모드 A — train/val에도 앙상블이 있는 경우 (`ensemble`)**
-멤버 평균을 학습하고, test 멤버 평균을 1회 보정합니다.
+연구에서 쓴 설정은 **K=8 앙상블 멤버 보정**입니다. 멤버 8개를 모두 학습 데이터로 쓰고,
+test에서는 멤버 8개를 각각 보정한 뒤 평균해 최종 예측을 만듭니다.
 
 ```bash
-python train_refiner.py --mode ensemble --offset 1 --gpu 0
-python infer_refiner.py --mode ensemble --offset 1 --gpu 0
+DUMPS=/path/to/dumps        # {split}/member_XX/{timestamp}.pt  (위 '데이터 구조')
+RAW=/path/to/raw_frames     # {timestamp}.npy
+WORK=./work/k8              # 실험마다 다른 폴더
+
+# 1) 학습
+python train_refiner.py --mode member --offset 1 \
+    --train_members all --expect_members 8 \
+    --dumps_root $DUMPS --raw_data_dir $RAW --work_dir $WORK --gpu 0
+
+# 2) 보정 추론
+python infer_refiner.py --mode member --offset 1 --save_members \
+    --dumps_root $DUMPS --raw_data_dir $RAW --work_dir $WORK --gpu 0
 ```
 
-**모드 B — train/val에 단일 멤버만 있는 경우 (`member`)**
-member_00 하나로 학습하고, test 멤버 K개를 각각 보정한 뒤 평균해 최종 출력을 만듭니다.
+- horizon(t+1 ~ t+4)마다 `--offset`만 바꿔 따로 실행합니다. refiner도 horizon마다 따로 학습됩니다.
+- 경로 세 개는 `config.py`에 적어 두면 명령에서 뺄 수 있습니다.
+- epoch 수(30) 등 나머지는 기본값 그대로 쓰면 됩니다. 기본값은 아래 [인자](#인자) 표에 있습니다.
+
+**산출물** (`{N}` = `--offset`)
+
+| 경로 | 내용 |
+|---|---|
+| `$WORK/refiner_t{N}_member/best_R.pt` | 검증 손실이 가장 낮은 epoch의 가중치. 추론은 이것을 씁니다 |
+| `$WORK/refiner_t{N}_member/last_R.pt`, `ep{E}_R.pt` | 마지막 epoch / epoch별 가중치 (개당 ~9MB) |
+| `$WORK/refiner_t{N}_member/loss_log.csv`, `train_cmd.txt` | epoch별 손실·LR / 실행한 명령 기록 |
+| `$WORK/outputs_t{N}_member/prediction/{timestamp}.pt` | **최종 예측** (보정본 8개의 평균) |
+| `$WORK/outputs_t{N}_member/refined_member_00 … 07/` | 멤버별 보정본 (`--save_members`일 때, CRPS 채점에 필요) |
+
+예측 파일은 값 범위 [-1, 1]의 `(1,H,W)` 텐서입니다. 물리 단위로 되돌리려면 `x_raw = (x+1)/2*(max-min)+min`.
+
+## 인자
+
+학습(`train_refiner.py`)과 추론(`infer_refiner.py`)에 **같은 `--offset`, `--work_dir`** 을 줘야
+추론이 학습한 체크포인트를 찾습니다. 기본값이 `config.py`로 적힌 인자는 그 파일 값을 따릅니다.
+
+### 공통
+
+| 인자 | 기본값 | 설명 |
+|---|---|---|
+| `--mode` | (필수) | `member`: 멤버마다 보정한 뒤 평균 (연구 채택). `ensemble`: 멤버 평균을 한 번만 보정 (비교 실험에서 열세, 미채택) |
+| `--offset N` | (필수) | 예측 horizon. 마지막 입력 프레임에서 N프레임(N×30분) 뒤 |
+| `--dumps_root` | `config.py` | 베이스 모델 예측 덤프 폴더 |
+| `--raw_data_dir` | `config.py` | 원본 프레임 폴더. context 5장과 GT를 여기서 읽습니다 |
+| `--work_dir` | `./work` | 체크포인트·출력 폴더. 하위 폴더 이름(`refiner_t{N}_member`)이 설정과 무관하게 같으므로 실험마다 따로 지정하세요 |
+| `--gpu` | `0` | GPU 번호. `-1`이면 CPU |
+| `--seed` | `1253` | 학습: 초기화·셔플·노이즈 고정 (같은 시드·설정이면 같은 가중치). 추론: DDIM 초기 노이즈 고정 |
+| `--batch_size` | `4` | |
+
+### 학습 전용
+
+| 인자 | 기본값 | 설명 |
+|---|---|---|
+| `--train_members` | `first` | `all`: 모든 멤버로 학습 (K=8 설정, 타임스탬프당 샘플 K개). `first`: member_00만 |
+| `--val_members` | `all` | 검증에 쓸 멤버. `first`면 member_00만 써서 검증 시간이 1/K로 줄어듭니다 |
+| `--expect_members K` | `0` (끔) | 찾은 멤버 수가 K가 아니면 바로 중단. split 폴더가 심링크면 멤버가 늘어도 에러 없이 K가 바뀌므로 꼭 지정하세요 |
+| `--epochs` | `30` | |
+| `--warmup_epochs` | `10` | 선형 warmup 뒤 코사인 감소 |
+| `--lr` / `--min_lr` | `1e-4` / `1e-6` | |
+| `--weight_decay` | `1e-4` | |
+| `--save_every` | `1` | N epoch마다 `ep{E}_R.pt` 저장 (`0`이면 끔). 나중에 epoch별 비교·재현이 필요할 수 있으니 끄지 않기를 권장 |
+
+### 추론 전용
+
+| 인자 | 기본값 | 설명 |
+|---|---|---|
+| `--save_members` | 꺼짐 | 멤버별 보정본도 저장. CRPS 같은 앙상블 지표를 채점하려면 필요 |
+| `--R_ckpt` | `best_R.pt` | 다른 체크포인트를 쓸 때 경로 지정 (예: `last_R.pt`) |
+| `--split` | `test` | 보정할 split |
+| `--ddim_steps` | `40` | DDIM 샘플링 스텝 수 |
+| `--shards N` / `--shard i` | `1` / `0` | 여러 GPU로 나눠 실행할 때 사용. 전체를 N조각으로 나눠 i번째(0부터)만 처리 |
+
+여러 GPU로 나눌 때는 `--shard`만 바꿔 GPU마다 실행합니다. 각 조각이 서로 다른 파일을 쓰므로 같은
+`--work_dir`에 그대로 모입니다. 초기 노이즈가 샘플 이름으로 정해지므로 한 번에 돌린 결과와 같습니다
+(배치 구성이 달라져 생기는 1e-7 수준의 부동소수점 차이만 있음).
 
 ```bash
-python train_refiner.py --mode member --offset 1 --gpu 0
-python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
+python infer_refiner.py --mode member --offset 1 --save_members --gpu 0 --shards 2 --shard 0 --work_dir $WORK ...
+python infer_refiner.py --mode member --offset 1 --save_members --gpu 1 --shards 2 --shard 1 --work_dir $WORK ...
 ```
 
-**모드 B 변형 — train/val에도 멤버가 전부 있는 경우 (`--train_members all`)**
-모든 멤버를 union으로 학습합니다(타임스탬프당 멤버 수만큼 학습 샘플).
-검증 풀은 `--val_members`로 **학습과 독립적으로** 정합니다: `first`를 주면
-member_0 하나로만 검증해 에폭당 검증 비용이 1/K로 줄고, val MSE는 단일 멤버의
-수천 샘플 평균만으로도 안정적이라 best 선택에 미치는 영향은 미미합니다.
-추론은 모드 B와 같습니다(멤버 각각 보정 → 평균). 에폭당 데이터가 멤버 수배가 되므로
-`--epochs`/`--warmup_epochs`를 그에 맞게 줄이는 것을 권장합니다.
+### 그 밖의 인자
 
-`--expect_members K`를 함께 주세요. dumps의 split 폴더가 실제 멤버 폴더로의 심링크인
-구성에서는 그 대상에 멤버가 추가되면 **에러 없이 K가 바뀝니다**. K를 표에 쓰는 실험에서는
-발견된 멤버 수가 기대와 다를 때 즉시 중단시키는 편이 안전합니다(종료코드 1).
-
-```bash
-python train_refiner.py --mode member --train_members all --val_members first \
-    --expect_members 8 --offset 1 --gpu 0 --epochs 12 --warmup_epochs 4
-python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members
-```
-
-> ⚠️ **2026-09-08 동작 변경 2건** (재현성 수정)
->
-> 1. `--val_members all`이 이제 실제로 전 멤버 검증을 합니다. 이전 구현은
->    `train_members == "all"`일 때만 `all`을 인정해, **기본값 조합**
->    (`--train_members first` + `--val_members all`)에서 조용히 member_0 단독 검증을
->    했습니다. 플래그를 명시해 온 런(`--train_members all --val_members first` 등)의
->    동작과 과거 결과 해석은 바뀌지 않습니다.
-> 2. 검증의 확산 타임스텝·노이즈가 **매 epoch 고정 추출**로 바뀌었습니다. 이전에는 매
->    epoch 새로 뽑아 val 값에 샘플링 노이즈가 섞였고, `best_R.pt` 선택이 그 노이즈에
->    좌우될 수 있었습니다(모델은 그대로인데 쉬운 t가 뽑힌 epoch이 best가 되는 식).
->    옛 동작은 `--val_stochastic`.
-
-> ✅ **완료 (2026-08-26)**: 앙상블을 12멤버로 확장한 union 재학습(이 조합
-> `--train_members all --val_members first`, member_0 단독 검증)과 mean·median 집계
-> 비교를 완료했습니다. 결론 — **median 집계는 소폭의 정확도 손실로 FID·LPIPS를 개선**하고,
-> **8→12 확장은 뚜렷한 이득이 없습니다**(FID·LPIPS·CRPS는 8멤버가 우위). 전체 결과 표는
-> [기술 문서 §9](https://hollyriver.github.io/DiffusionRefiner/#s9)를 참고하세요.
-
-주의: 변형(예: first vs all)마다 체크포인트 폴더명이 같으므로(`refiner_t{N}_member`)
-**실험별로 `--work_dir`를 분리**하세요.
-
-최종 출력: `{work_dir}/outputs_t{N}_{mode}/prediction/{timestamp}.pt`
-(m11 범위, `(1,H,W)`, 타임스탬프당 1개). 물리 단위 복원: `x_raw = (x+1)/2*(max-min)+min`.
-
-체크포인트: `{work_dir}/refiner_t{N}_{mode}/`에 `best_R.pt`(최저 val), `last_R.pt`(최종
-epoch)와 함께 기본값으로 **매 epoch `ep{에폭}_R.pt`가 저장됩니다** (`--save_every N`,
-0=끄기, 개당 ~9MB — 30 epoch에 ~270MB). 중간-epoch 성능 비교나 특정 epoch 재현이
-나중에 필요해질 수 있으므로 끄지 않기를 권장합니다.
-
-horizon이 여러 개면 `--offset 1..4`를 각각 실행하세요 (horizon마다 별도 refiner).
-
-## 멀티-GPU 추론 (선택)
-
-테스트 세트를 strided로 쪼개 GPU마다 한 프로세스씩 돌릴 수 있습니다. 초기 노이즈 시드가
-**샘플명 기반**(`seed_from_name(base_seed + 1000*k, name)`)이라 샤드 구성이 결과에 영향을
-주지 않습니다 — 샤드 합집합이 단일 실행과 비트 단위로 동일함을 확인했습니다.
-
-```bash
-# GPU 0, 1 에 각각
-python infer_refiner.py --mode member --offset 1 --gpu 0 --save_members --shards 2 --shard 0
-python infer_refiner.py --mode member --offset 1 --gpu 1 --save_members --shards 2 --shard 1
-```
-
-`--shard`는 `[0, --shards)` 범위여야 하며 벗어나면 중단합니다(종료코드 1). 검사가 없으면
-파이썬 슬라이스가 에러 없이 다른 샤드와 겹치는 구간을 돌려주어, 일부 샘플이 두 번 계산되고
-일부는 누락된 채 조용히 끝납니다. `--work_dir`는 샤드별로 분리하고, 채점 전에 합치세요.
-
-## 재현성
-
-`--seed`(기본 `config.py: seed`)가 학습 난수 4곳을 모두 고정합니다 — **모델 초기화**,
-DataLoader shuffle, 확산 타임스텝 `t`, 노이즈. 같은 시드·같은 설정이면 체크포인트
-가중치가 비트 단위로 일치합니다(검증됨). 비트 단위 재현을 더 강하게 원하면
-`--cudnn_deterministic`(느려짐)을 추가하세요.
-
-호출 CLI 전문은 `{work_dir}/refiner_t{N}_{mode}/train_cmd.txt`에 실행마다 append됩니다.
-나중에 "이 체크포인트가 어떤 설정으로 나왔는지"를 역산하지 않으려면 이 파일을
-체크포인트와 함께 보관하세요.
+- 데이터 규칙이 다를 때: `--member_glob` (멤버 폴더 패턴, 기본 `member_*`), `--dump_value_range` (`m11` | `raw`). 아래 "적응 가이드" 참고
+- 빠른 점검용: `--max_iters_per_epoch` (학습), `--max_samples` (추론), `--num_workers`
+- 중단된 학습 이어하기: `--resume_ckpt ep{E}_R.pt --start_epoch {E} --init_best_val {기존 best의 val 손실}`
+- 재현성: `--cudnn_deterministic` (비트 단위 재현에 더 가깝게, 느려짐), `--val_stochastic` (검증 노이즈를 매 epoch 새로 뽑던 2026-09-08 이전 동작)
 
 ## 전체 흐름도
 
